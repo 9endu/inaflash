@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ultimate Flashcards</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="light-mode">
+  <div class="app">
+    <!-- Header -->
+    <header>
+      <h1><i class="fas fa-layer-group"></i> Ultimate Flashcards</h1>
+      <div class="header-actions">
+        <button id="toggleThemeBtn"><i class="fas fa-moon"></i></button>
+        <button id="importBtn"><i class="fas fa-file-import"></i> Import</button>
+        <button id="exportBtn"><i class="fas fa-file-export"></i> Export</button>
+      </div>
+    </header>
+
+    <!-- Deck Selection Screen -->
+    <div class="screen" id="deckScreen">
+      <div class="decks" id="decksContainer"></div>
+      <button id="newDeckBtn" class="primary-btn"><i class="fas fa-plus"></i> New Deck</button>
+    </div>
+
+    <!-- Editor Screen -->
+    <div class="screen hidden" id="editorScreen">
+      <div class="editor-header">
+        <h2 id="currentDeckName">Deck Name</h2>
+        <div class="editor-actions">
+          <button id="studyBtn" class="primary-btn"><i class="fas fa-book-open"></i> Study</button>
+          <button id="quizBtn" class="primary-btn"><i class="fas fa-question-circle"></i> Quiz</button>
+          <button id="backToDecksBtn"><i class="fas fa-arrow-left"></i> Decks</button>
+        </div>
+      </div>
+      <div class="cards" id="cardsContainer"></div>
+      <button id="addCardBtn" class="primary-btn"><i class="fas fa-plus"></i> Add Card</button>
+    </div>
+
+    <!-- Study Screen -->
+    <div class="screen hidden" id="studyScreen">
+      <div class="study-header">
+        <h2>Study Mode</h2>
+        <div class="study-actions">
+          <button id="shuffleBtn"><i class="fas fa-random"></i> Shuffle</button>
+          <button id="exitStudyBtn"><i class="fas fa-times"></i> Exit</button>
+        </div>
+      </div>
+      <div class="flashcard-container">
+        <div class="flashcard" id="flashcard">
+          <div class="card-face front" id="cardFront"></div>
+          <div class="card-face back" id="cardBack"></div>
+        </div>
+        <div class="flashcard-nav">
+          <button id="prevCardBtn"><i class="fas fa-chevron-left"></i></button>
+          <div class="progress" id="progress">1/10</div>
+          <button id="nextCardBtn"><i class="fas fa-chevron-right"></i></button>
+        </div>
+        <button id="flipCardBtn" class="primary-btn"><i class="fas fa-sync-alt"></i> Flip Card</button>
+      </div>
+    </div>
+
+    <!-- Quiz Screen -->
+    <div class="screen hidden" id="quizScreen">
+      <div class="quiz-header">
+        <h2>Quiz Mode</h2>
+        <button id="exitQuizBtn"><i class="fas fa-times"></i> Exit</button>
+      </div>
+      <div class="quiz-container">
+        <div class="quiz-question" id="quizQuestion"></div>
+        <div class="quiz-options" id="quizOptions"></div>
+        <button id="nextQuizBtn" class="hidden primary-btn">Next Question</button>
+        <div class="quiz-score" id="quizScore">Score: 0/0</div>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ultimate Flashcards</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="light-mode">
+  <div class="app">
+    <!-- Header -->
+    <header>
+      <h1><i class="fas fa-layer-group"></i> Ultimate Flashcards</h1>
+      <div class="header-actions">
+        <button id="toggleThemeBtn"><i class="fas fa-moon"></i></button>
+        <button id="importBtn"><i class="fas fa-file-import"></i> Import</button>
+        <button id="exportBtn"><i class="fas fa-file-export"></i> Export</button>
+      </div>
+    </header>
+
+    <!-- Deck Selection Screen -->
+    <div class="screen" id="deckScreen">
+      <div class="decks" id="decksContainer"></div>
+      <button id="newDeckBtn" class="primary-btn"><i class="fas fa-plus"></i> New Deck</button>
+    </div>
+
+    <!-- Editor Screen -->
+    <div class="screen hidden" id="editorScreen">
+      <div class="editor-header">
+        <h2 id="currentDeckName">Deck Name</h2>
+        <div class="editor-actions">
+          <button id="studyBtn" class="primary-btn"><i class="fas fa-book-open"></i> Study</button>
+          <button id="quizBtn" class="primary-btn"><i class="fas fa-question-circle"></i> Quiz</button>
+          <button id="backToDecksBtn"><i class="fas fa-arrow-left"></i> Decks</button>
+        </div>
+      </div>
+      <div class="cards" id="cardsContainer"></div>
+      <button id="addCardBtn" class="primary-btn"><i class="fas fa-plus"></i> Add Card</button>
+    </div>
+
+    <!-- Study Screen -->
+    <div class="screen hidden" id="studyScreen">
+      <div class="study-header">
+        <h2>Study Mode</h2>
+        <div class="study-actions">
+          <button id="shuffleBtn"><i class="fas fa-random"></i> Shuffle</button>
+          <button id="exitStudyBtn"><i class="fas fa-times"></i> Exit</button>
+        </div>
+      </div>
+      <div class="flashcard-container">
+        <div class="flashcard" id="flashcard">
+          <div class="card-face front" id="cardFront"></div>
+          <div class="card-face back" id="cardBack"></div>
+        </div>
+        <div class="flashcard-nav">
+          <button id="prevCardBtn"><i class="fas fa-chevron-left"></i></button>
+          <div class="progress" id="progress">1/10</div>
+          <button id="nextCardBtn"><i class="fas fa-chevron-right"></i></button>
+        </div>
+        <button id="flipCardBtn" class="primary-btn"><i class="fas fa-sync-alt"></i> Flip Card</button>
+      </div>
+    </div>
+
+    <!-- Quiz Screen -->
+    <div class="screen hidden" id="quizScreen">
+      <div class="quiz-header">
+        <h2>Quiz Mode</h2>
+        <button id="exitQuizBtn"><i class="fas fa-times"></i> Exit</button>
+      </div>
+      <div class="quiz-container">
+        <div class="quiz-question" id="quizQuestion"></div>
+        <div class="quiz-options" id="quizOptions"></div>
+        <button id="nextQuizBtn" class="hidden primary-btn">Next Question</button>
+        <div class="quiz-score" id="quizScore">Score: 0/0</div>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
