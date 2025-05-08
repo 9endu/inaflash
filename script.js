@@ -142,8 +142,8 @@ function showCurrentCard() {
   const deck = decks.find(d => d.id === currentDeckId);
   if (!deck || !deck.cards[currentCardIndex]) return;
   
-  cardFront.innerHTML = marked.parse(deck.cards[currentCardIndex].front);
-  cardBack.innerHTML = marked.parse(deck.cards[currentCardIndex].back);
+  cardFront.innerHTML = deck.cards[currentCardIndex].front.replace(/\n/g, '<br>');
+  cardBack.innerHTML = deck.cards[currentCardIndex].back.replace(/\n/g, '<br>');
   flashcard.classList.remove('flipped');
   progress.textContent = `${currentCardIndex + 1}/${deck.cards.length}`;
 }
