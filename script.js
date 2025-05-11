@@ -29,15 +29,101 @@ setupEventListeners();
 function renderDecks() {
   decksContainer.innerHTML = '';
   decks.forEach(deck => {
-    const deckElement = document.createElement('div');
-    deckElement.className = 'deck';
-    deckElement.innerHTML = `
-      <h3>${deck.name}</h3>
-      <p>${deck.cards.length} cards</p>
-    `;
-    deckElement.addEventListener('click', () => openDeck(deck.id));
-    decksContainer.appendChild(deckElement);
+    decksContainer.appendChild(createDeckElement(deck));
   });
+}
+
+function createDeckElement(deck) {
+  const deckElement = document.createElement('div');
+  deckElement.className = 'deck';
+  deckElement.dataset.id = deck.id;
+  
+  const deckTitle = document.createElement('h3');
+  deckTitle.textContent = deck.name;
+  deckTitle.className = 'deck-title';
+  
+  const deckActions = document.createElement('div');
+  deckActions.className = 'deck-actions';
+  
+  const editBtn = document.createElement('button');
+  editBtn.className = 'icon-btn';
+  editBtn.innerHTML = '<i class="fas fa-edit"></i>';
+  editBtn.title = 'Edit Deck Name';
+  editBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    editDeckName(deck.id, deckTitle);
+  });
+  
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'icon-btn';
+  deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+  deleteBtn.title = 'Delete Deck';
+  deleteBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    deleteDeck(deck.id);
+  });
+  
+  deckActions.appendChild(editBtn);
+  deckActions.appendChild(deleteBtn);
+  
+  const cardCount = document.createElement('p');
+  cardCount.textContent = `${deck.cards.length} cards`;
+  
+  deckElement.appendChild(deckTitle);
+  deckElement.appendChild(cardCount);
+  deckElement.appendChild(deckActions);
+  
+  deckElement.addEventListener('click', () => openDeck(deck.id));
+  
+  return deckElement;
+}
+
+function editDeckName(deckId, titleElement) {
+  const deck = decks.find(d => d.id === deckId);
+  if (!deck) return;
+  
+  const currentName = deck.name;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentName;
+  input.className = 'deck-name-input';
+  
+  // Replace the title with input
+  titleElement.replaceWith(input);
+  input.focus();
+  
+  function saveName() {
+    const newName = input.value.trim();
+    if (newName && newName !== currentName) {
+      deck.name = newName;
+      saveDecks();
+      
+      // Update the title
+      titleElement.textContent = newName;
+      document.getElementById('currentDeckName').textContent = newName;
+    }
+    input.replaceWith(titleElement);
+  }
+  
+  input.addEventListener('blur', saveName);
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      saveName();
+    }
+  });
+}
+
+function deleteDeck(deckId) {
+  if (confirm('Delete this deck and all its cards?')) {
+    decks = decks.filter(deck => deck.id !== deckId);
+    saveDecks();
+    renderDecks();
+    // If we were viewing this deck, go back to deck screen
+    if (currentDeckId === deckId) {
+      switchScreen(editorScreen, deckScreen);
+      currentDeckId = null;
+    }
+  }
 }
 
 function createNewDeck() {

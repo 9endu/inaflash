@@ -333,6 +333,47 @@
     box-shadow: var(--shadow);
     border: 1px solid var(--border-color);
   }
+  /* Deck styling */
+.deck {
+  /* ... existing deck styles ... */
+  position: relative;
+}
+
+.deck-actions {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: none;
+}
+
+.deck:hover .deck-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 5px;
+  border-radius: 4px;
+}
+
+.icon-btn:hover {
+  background-color: var(--hover-color);
+}
+
+.deck-name-input {
+  width: calc(100% - 20px);
+  padding: 8px;
+  font-size: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--input-bg);
+  color: var(--text-color);
+}
   
   .quiz-options {
     display: grid;
