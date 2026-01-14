@@ -113,6 +113,7 @@
         <div class="editor-actions">
           <button id="studyBtn" class="primary-btn"><i class="fas fa-book-open"></i> Study</button>
           <button id="quizBtn" class="primary-btn"><i class="fas fa-question-circle"></i> Quiz</button>
+          <button id="examBtn" class="primary-btn"><i class="fas fa-graduation-cap"></i> Exam</button>
           <button id="backToDecksBtn"><i class="fas fa-arrow-left"></i> Decks</button>
         </div>
       </div>
@@ -154,6 +155,28 @@
         <div class="quiz-options" id="quizOptions"></div>
         <button id="nextQuizBtn" class="hidden primary-btn">Next Question</button>
         <div class="quiz-score" id="quizScore">Score: 0/0</div>
+      </div>
+    </div>
+
+    <!-- Exam Screen -->
+    <div class="screen hidden" id="examScreen">
+      <div class="exam-header">
+        <h2>Exam Mode</h2>
+        <button id="exitExamBtn"><i class="fas fa-times"></i> Exit</button>
+      </div>
+      <div class="exam-container">
+        <div class="exam-info">
+          <div class="exam-timer" id="examTimer">Time: 30:00</div>
+          <div class="exam-progress" id="examProgress">Question 1/10</div>
+        </div>
+        <div class="exam-question" id="examQuestion"></div>
+        <div class="exam-options" id="examOptions"></div>
+        <div class="exam-navigation">
+          <button id="prevExamBtn"><i class="fas fa-chevron-left"></i> Previous</button>
+          <button id="nextExamBtn" class="primary-btn">Next <i class="fas fa-chevron-right"></i></button>
+          <button id="submitExamBtn" class="submit-btn hidden">Submit Exam</button>
+        </div>
+        <div class="exam-score hidden" id="examScore">Score: 0/0 (0%)</div>
       </div>
     </div>
   </div>
