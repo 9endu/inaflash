@@ -1,31 +1,54 @@
 // ===== App State =====
-let decks = JSON.parse(localStorage.getItem('flashcardDecks')) || [];
+let decks = [];
 let currentDeckId = null;
 let currentCardIndex = 0;
+let user = null; // Firebase User
+let unsubscribeDecks = null; // Firestore listener
+
+// ... (retain existing quiz/exam state variables) ...
+
+// ... (retain existing quiz/exam state variables) ...
 let quizCards = [];
 let quizScore = 0;
-let examCards = []; // Changed from examQuestions to examCards
+let examCards = [];
 let currentExamIndex = 0;
 let examScore = 0;
-let examAttempts = []; // Track attempts for each card
+let examAttempts = [];
 let examTimer = null;
-let examTimeLeft = 1800; // 30 minutes in seconds
+let examTimeLeft = 1800;
 let examSettings = {
   timeLimit: 1800,
   questionCount: 10,
   passPercentage: 70,
-  maxAttempts: 2, // How many times user can try each question
-  showHint: true, // Whether to show hints
-  immediateFeedback: true // Show if answer is right/wrong immediately
+  maxAttempts: 2,
+  showHint: true,
+  immediateFeedback: true
 };
-let userExamAnswer = ''; // User's typed answer
+let userExamAnswer = '';
 
 // ===== DOM Elements =====
+const homeScreen = document.getElementById('homeScreen');
+const authScreen = document.getElementById('authScreen');
 const deckScreen = document.getElementById('deckScreen');
 const editorScreen = document.getElementById('editorScreen');
 const studyScreen = document.getElementById('studyScreen');
 const quizScreen = document.getElementById('quizScreen');
 const examScreen = document.getElementById('examScreen');
+
+// Auth DOM
+const getStartedBtn = document.getElementById('getStartedBtn');
+const loginBtn = document.getElementById('loginBtn');
+const authForm = document.getElementById('authForm');
+const authTitle = document.getElementById('authTitle');
+const authSubmitBtn = document.getElementById('authSubmitBtn');
+const authSwitchBtn = document.getElementById('authSwitchBtn');
+const authSwitchText = document.getElementById('authSwitchText');
+const backToHomeBtn = document.getElementById('backToHomeBtn');
+const userActions = document.getElementById('userActions');
+const userEmailSpan = document.getElementById('userEmail');
+const logoutBtn = document.getElementById('logoutBtn');
+
+// ... (retain existing DOM elements) ...
 const decksContainer = document.getElementById('decksContainer');
 const cardsContainer = document.getElementById('cardsContainer');
 const currentDeckName = document.getElementById('currentDeckName');
@@ -53,8 +76,154 @@ const hintContainer = document.createElement('div');
 const examResult = document.createElement('div');
 
 // ===== Initialize =====
-renderDecks();
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+  // Check Auth State
+  auth.onAuthStateChanged(firebaseUser => {
+    user = firebaseUser;
+    if (user) {
+      // User is signed in.
+      showApp();
+      userEmailSpan.textContent = user.email;
+      userActions.classList.remove('hidden');
+    } else {
+      // No user is signed in.
+      showHome();
+      userActions.classList.add('hidden');
+    }
+  });
+});
+
+// ... inside subscribeToDecks ...
+function subscribeToDecks() {
+  if (!user) return;
+
+  if (unsubscribeDecks) unsubscribeDecks();
+
+  const userDecksRef = db.collection('users').doc(user.uid).collection('decks');
+
+  unsubscribeDecks = userDecksRef.onSnapshot(snapshot => {
+    decks = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    renderDecks();
+
+    // If currently viewing a deck, update it
+    if (currentDeckId) {
+      const currentDeck = decks.find(d => d.id === currentDeckId);
+      if (currentDeck) {
+        renderCards(currentDeck.cards || []);
+      }
+    }
+  }, error => {
+    console.error("Error fetching decks: ", error);
+  });
+}
+
 setupEventListeners();
+
+// ===== Auth Functions =====
+let isLoginMode = true;
+
+function toggleAuthMode() {
+  isLoginMode = !isLoginMode;
+  if (isLoginMode) {
+    authTitle.textContent = "Login";
+    authSubmitBtn.textContent = "Login";
+    authSwitchText.textContent = "Don't have an account?";
+    authSwitchBtn.textContent = "Sign Up";
+  } else {
+    authTitle.textContent = "Sign Up";
+    authSubmitBtn.textContent = "Sign Up";
+    authSwitchText.textContent = "Already have an account?";
+    authSwitchBtn.textContent = "Login";
+  }
+}
+
+async function handleAuth(e) {
+  e.preventDefault();
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+
+  // Show Loading State
+  const originalBtnText = authSubmitBtn.textContent;
+  authSubmitBtn.disabled = true;
+  authSubmitBtn.innerHTML = '<div class="loader"></div> Processing...';
+
+  try {
+    if (isLoginMode) {
+      await auth.signInWithEmailAndPassword(email, password);
+    } else {
+      await auth.createUserWithEmailAndPassword(email, password);
+    }
+    // Success: State change listener handles redirect
+  } catch (error) {
+    alert(error.message);
+    // Reset Button on Error
+    authSubmitBtn.disabled = false;
+    authSubmitBtn.textContent = originalBtnText;
+  }
+}
+
+function signOut() {
+  auth.signOut();
+}
+
+function setupEventListeners() {
+  // Auth Listeners
+  if (getStartedBtn) getStartedBtn.addEventListener('click', showAuth);
+  if (loginBtn) loginBtn.addEventListener('click', showAuth);
+  if (authSwitchBtn) authSwitchBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    toggleAuthMode();
+  });
+  if (authForm) authForm.addEventListener('submit', handleAuth);
+  if (backToHomeBtn) backToHomeBtn.addEventListener('click', showHome);
+  if (logoutBtn) logoutBtn.addEventListener('click', signOut);
+
+  // App Listeners
+  document.getElementById('newDeckBtn').addEventListener('click', createNewDeck);
+  document.getElementById('addCardBtn').addEventListener('click', addNewCard);
+
+  // Navigation
+  document.getElementById('backToDecksBtn').addEventListener('click', () => {
+    switchScreen(editorScreen, deckScreen);
+    currentDeckId = null;
+  });
+
+  // Modes
+  document.getElementById('studyBtn').addEventListener('click', startStudyMode);
+  document.getElementById('quizBtn').addEventListener('click', startQuizMode);
+  document.getElementById('examBtn').addEventListener('click', showExamSettings);
+  document.getElementById('masteryBtn').addEventListener('click', () => startMasteryMode());
+
+  // Theme
+  document.getElementById('toggleThemeBtn').addEventListener('click', toggleTheme);
+
+  // Study controls
+  document.getElementById('flipCardBtn').addEventListener('click', flipCard);
+  document.getElementById('nextCardBtn').addEventListener('click', nextCard);
+  document.getElementById('prevCardBtn').addEventListener('click', prevCard);
+  document.getElementById('shuffleBtn').addEventListener('click', shuffleCards);
+  document.getElementById('exitStudyBtn').addEventListener('click', exitStudyMode);
+
+  // Quiz controls
+  document.getElementById('nextQuizBtn').addEventListener('click', nextQuizQuestion);
+  document.getElementById('exitQuizBtn').addEventListener('click', exitQuizMode);
+
+  // Exam controls
+  document.getElementById('prevExamBtn').addEventListener('click', prevExamQuestion);
+  document.getElementById('nextExamBtn').addEventListener('click', nextExamQuestion);
+  document.getElementById('exitExamBtn').addEventListener('click', exitExamMode);
+  document.getElementById('submitExamBtn').addEventListener('click', showExamResults);
+
+  // Mastery Mode controls
+  document.getElementById('showMasteryAnswerBtn').addEventListener('click', showMasteryAnswer);
+  document.getElementById('markWrongBtn').addEventListener('click', () => handleMasteryGrade(false));
+  document.getElementById('markRightBtn').addEventListener('click', () => handleMasteryGrade(true));
+  document.getElementById('exitMasteryBtn').addEventListener('click', exitMasteryMode);
+}
 
 // Load exam settings if saved
 const savedExamSettings = localStorage.getItem('examSettings');
@@ -62,7 +231,71 @@ if (savedExamSettings) {
   examSettings = JSON.parse(savedExamSettings);
 }
 
+
+
 // ===== Core Functions =====
+
+// Fetch Decks from Firestore
+function subscribeToDecks() {
+  if (!user) return;
+
+  if (unsubscribeDecks) unsubscribeDecks();
+
+  const userDecksRef = db.collection('users').doc(user.uid).collection('decks');
+  console.log("Subscribing to:", user.uid); // Debug log
+
+  unsubscribeDecks = userDecksRef.onSnapshot(snapshot => {
+    console.log("Snapshot received!", snapshot.size, "docs"); // Debug log
+
+    if (snapshot.empty) {
+      // Optional: Inform user if no decks exist yet
+      // console.log("No decks found.");
+    }
+
+    decks = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    renderDecks();
+
+    // If currently viewing a deck, update it
+    if (currentDeckId) {
+      const currentDeck = decks.find(d => d.id === currentDeckId);
+      if (currentDeck) {
+        renderCards(currentDeck.cards || []);
+      }
+    }
+  }, error => {
+    console.error("Error fetching decks: ", error);
+    if (error.code === 'permission-denied') {
+      alert("Database Access Denied: \nPlease go to Firebase Console > Firestore Database > Rules and allow access. (See the 'Missing Permissions' section in the guide I sent).");
+    } else {
+      alert("Error loading data: " + error.message);
+    }
+  });
+}
+
+function showHome() {
+  hideAllScreens();
+  homeScreen.classList.remove('hidden');
+}
+
+function showAuth() {
+  hideAllScreens();
+  authScreen.classList.remove('hidden');
+}
+
+function showApp() {
+  hideAllScreens();
+  deckScreen.classList.remove('hidden');
+  subscribeToDecks(); // Start syncing data
+}
+
+function hideAllScreens() {
+  const screens = document.querySelectorAll('.screen');
+  screens.forEach(s => s.classList.add('hidden'));
+}
+
 function renderDecks() {
   decksContainer.innerHTML = '';
   decks.forEach(deck => {
@@ -74,14 +307,14 @@ function createDeckElement(deck) {
   const deckElement = document.createElement('div');
   deckElement.className = 'deck';
   deckElement.dataset.id = deck.id;
-  
+
   const deckTitle = document.createElement('h3');
   deckTitle.textContent = deck.name;
   deckTitle.className = 'deck-title';
-  
+
   const deckActions = document.createElement('div');
   deckActions.className = 'deck-actions';
-  
+
   const editBtn = document.createElement('button');
   editBtn.className = 'icon-btn';
   editBtn.innerHTML = '<i class="fas fa-edit"></i>';
@@ -90,7 +323,7 @@ function createDeckElement(deck) {
     e.stopPropagation();
     editDeckName(deck.id, deckTitle);
   });
-  
+
   const deleteBtn = document.createElement('button');
   deleteBtn.className = 'icon-btn';
   deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
@@ -99,49 +332,52 @@ function createDeckElement(deck) {
     e.stopPropagation();
     deleteDeck(deck.id);
   });
-  
+
   deckActions.appendChild(editBtn);
   deckActions.appendChild(deleteBtn);
-  
+
   const cardCount = document.createElement('p');
-  cardCount.textContent = `${deck.cards.length} cards`;
-  
+  cardCount.textContent = `${deck.cards ? deck.cards.length : 0} cards`;
+
   deckElement.appendChild(deckTitle);
   deckElement.appendChild(cardCount);
   deckElement.appendChild(deckActions);
-  
+
   deckElement.addEventListener('click', () => openDeck(deck.id));
-  
+
   return deckElement;
 }
 
 function editDeckName(deckId, titleElement) {
   const deck = decks.find(d => d.id === deckId);
   if (!deck) return;
-  
+
   const currentName = deck.name;
   const input = document.createElement('input');
   input.type = 'text';
   input.value = currentName;
   input.className = 'deck-name-input';
-  
+
   // Replace the title with input
   titleElement.replaceWith(input);
   input.focus();
-  
-  function saveName() {
+
+  async function saveName() {
     const newName = input.value.trim();
     if (newName && newName !== currentName) {
-      deck.name = newName;
-      saveDecks();
-      
-      // Update the title
-      titleElement.textContent = newName;
-      document.getElementById('currentDeckName').textContent = newName;
+      try {
+        await db.collection('users').doc(user.uid).collection('decks').doc(deckId).update({
+          name: newName
+        });
+      } catch (e) {
+        console.error("Error updating deck name:", e);
+        alert("Failed to update name");
+      }
     }
-    input.replaceWith(titleElement);
+    // No need to manually update UI, listener will handle it
+    input.replaceWith(titleElement); // Temporary revert until listener fires
   }
-  
+
   input.addEventListener('blur', saveName);
   input.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
@@ -150,30 +386,63 @@ function editDeckName(deckId, titleElement) {
   });
 }
 
-function deleteDeck(deckId) {
+async function deleteDeck(deckId) {
   if (confirm('Delete this deck and all its cards?')) {
-    decks = decks.filter(deck => deck.id !== deckId);
-    saveDecks();
-    renderDecks();
-    // If we were viewing this deck, go back to deck screen
-    if (currentDeckId === deckId) {
-      switchScreen(editorScreen, deckScreen);
-      currentDeckId = null;
+    try {
+      await db.collection('users').doc(user.uid).collection('decks').doc(deckId).delete();
+      // Listener updates UI
+      if (currentDeckId === deckId) {
+        switchScreen(editorScreen, deckScreen);
+        currentDeckId = null;
+      }
+    } catch (e) {
+      console.error("Error deleting deck:", e);
+      alert("Failed to delete deck");
     }
   }
 }
 
-function createNewDeck() {
+async function createNewDeck() {
+  log("Step 1: Button Clicked");
   const deckName = prompt('Enter deck name:');
+
   if (deckName) {
-    const newDeck = {
-      id: Date.now().toString(),
-      name: deckName,
-      cards: []
-    };
-    decks.push(newDeck);
-    saveDecks();
-    renderDecks();
+    log("Step 2: Name entered: " + deckName);
+
+    if (!user) {
+      log("Error: No user logged in!");
+      alert("Error: No user logged in!");
+      return;
+    }
+    log("Step 3: User ID is " + user.uid);
+
+    try {
+      log("Step 4: Attempting to write to Firestore...");
+
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Connection Timed Out. \n\nPOSSIBLE CAUSES:\n1. Firestore Database is NOT CREATED in Firebase Console.\n2. Internet connection issue.\n3. Firewall blocking Firestore.")), 5000);
+      });
+
+      // Race the write against the timeout
+      await Promise.race([
+        db.collection('users').doc(user.uid).collection('decks').add({
+          name: deckName,
+          cards: [],
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }),
+        timeoutPromise
+      ]);
+
+      log("Step 5: Success! Deck saved.");
+      // Listener updates UI
+    } catch (e) {
+      console.error("Error creating deck:", e);
+      log("Step 5 Failed: " + e.message);
+      alert("Step 5 Failed: " + e.message);
+    }
+  } else {
+    log("Cancelled or empty name");
   }
 }
 
@@ -181,7 +450,7 @@ function openDeck(deckId) {
   currentDeckId = deckId;
   const deck = decks.find(d => d.id === deckId);
   currentDeckName.textContent = deck.name;
-  renderCards(deck.cards);
+  renderCards(deck.cards || []);
   switchScreen(deckScreen, editorScreen);
 }
 
@@ -204,54 +473,70 @@ function renderCards(cards) {
     // Sync changes to data
     const frontTextarea = cardElement.querySelector('.front');
     const backTextarea = cardElement.querySelector('.back');
-    
-    frontTextarea.addEventListener('input', (e) => updateCard(index, 'front', e.target.value));
-    backTextarea.addEventListener('input', (e) => updateCard(index, 'back', e.target.value));
-    
+
+    // Debounce updates to avoid too many writes
+    frontTextarea.addEventListener('change', (e) => updateCard(index, 'front', e.target.value));
+    backTextarea.addEventListener('change', (e) => updateCard(index, 'back', e.target.value));
+
     cardElement.querySelector('.delete-card').addEventListener('click', () => deleteCard(index));
   });
 }
 
-function addNewCard() {
+async function addNewCard() {
   if (!currentDeckId) return;
-  decks = decks.map(deck => {
-    if (deck.id === currentDeckId) {
-      deck.cards.push({ front: '', back: '' });
-    }
-    return deck;
-  });
-  saveDecks();
-  renderCards(decks.find(d => d.id === currentDeckId).cards);
-  // Scroll to bottom
-  cardsContainer.lastElementChild?.scrollIntoView({ behavior: 'smooth' });
-}
+  const deckRef = db.collection('users').doc(user.uid).collection('decks').doc(currentDeckId);
 
-function updateCard(index, side, value) {
-  decks = decks.map(deck => {
-    if (deck.id === currentDeckId) {
-      deck.cards[index][side] = value;
-    }
-    return deck;
-  });
-  saveDecks();
-}
-
-function deleteCard(index) {
-  if (confirm('Delete this card?')) {
-    decks = decks.map(deck => {
-      if (deck.id === currentDeckId) {
-        deck.cards.splice(index, 1);
-      }
-      return deck;
+  try {
+    // Using arrayUnion to add to the array
+    // Note: This matches the structure {front: '', back: ''}
+    await deckRef.update({
+      cards: firebase.firestore.FieldValue.arrayUnion({ front: '', back: '' })
     });
-    saveDecks();
-    renderCards(decks.find(d => d.id === currentDeckId).cards);
+    // Scroll done by listener? No, listener re-renders all.
+    // We might want to scroll to bottom after render.
+    setTimeout(() => {
+      cardsContainer.lastElementChild?.scrollIntoView({ behavior: 'smooth' });
+    }, 500);
+  } catch (e) {
+    console.error("Error adding card:", e);
   }
 }
 
-// ===== Study Mode =====
+async function updateCard(index, side, value) {
+  // Firestore array update is tricky. easiest is to read, modify, write whole array.
+  // or store cards as subcollection. For now, matching existing structure (array in deck doc).
+  const deck = decks.find(d => d.id === currentDeckId);
+  const newCards = [...deck.cards];
+  newCards[index][side] = value;
+
+  try {
+    await db.collection('users').doc(user.uid).collection('decks').doc(currentDeckId).update({
+      cards: newCards
+    });
+  } catch (e) {
+    console.error("Error updating card:", e);
+  }
+}
+
+async function deleteCard(index) {
+  if (confirm('Delete this card?')) {
+    const deck = decks.find(d => d.id === currentDeckId);
+    const newCards = [...deck.cards];
+    newCards.splice(index, 1);
+
+    try {
+      await db.collection('users').doc(user.uid).collection('decks').doc(currentDeckId).update({
+        cards: newCards
+      });
+    } catch (e) {
+      console.error("Error deleting card:", e);
+    }
+  }
+}
+
 function startStudyMode() {
   const deck = decks.find(d => d.id === currentDeckId);
+
   if (deck.cards.length === 0) {
     alert('Add cards first!');
     return;
@@ -264,7 +549,7 @@ function startStudyMode() {
 function showCurrentCard() {
   const deck = decks.find(d => d.id === currentDeckId);
   if (!deck || !deck.cards[currentCardIndex]) return;
-  
+
   cardFront.innerHTML = deck.cards[currentCardIndex].front.replace(/\n/g, '<br>');
   cardBack.innerHTML = deck.cards[currentCardIndex].back.replace(/\n/g, '<br>');
   flashcard.classList.remove('flipped');
@@ -294,7 +579,7 @@ function shuffleCards() {
     const j = Math.floor(Math.random() * (i + 1));
     [deck.cards[i], deck.cards[j]] = [deck.cards[j], deck.cards[i]];
   }
-  saveDecks();
+  // saveDecks(); // Disabled for Firebase as we don't sync shuffle order yet
   currentCardIndex = 0;
   showCurrentCard();
 }
@@ -407,12 +692,12 @@ function showExamSettings() {
       </div>
     </div>
   `;
-  
+
   document.body.appendChild(modal);
-  
+
   modal.querySelector('.close-btn').addEventListener('click', () => modal.remove());
   modal.querySelector('.cancel-btn').addEventListener('click', () => modal.remove());
-  
+
   modal.querySelector('.start-exam-btn').addEventListener('click', () => {
     const timeMinutes = parseInt(modal.querySelector('#examTime').value) || 30;
     const questionCount = parseInt(modal.querySelector('#questionCount').value) || 10;
@@ -420,7 +705,7 @@ function showExamSettings() {
     const maxAttempts = parseInt(modal.querySelector('#maxAttempts').value) || 2;
     const showHint = modal.querySelector('#showHint').checked;
     const immediateFeedback = modal.querySelector('#immediateFeedback').checked;
-    
+
     examSettings = {
       timeLimit: timeMinutes * 60,
       questionCount: Math.min(questionCount, 50),
@@ -429,7 +714,7 @@ function showExamSettings() {
       showHint,
       immediateFeedback
     };
-    
+
     modal.remove();
     startExamMode();
   });
@@ -441,12 +726,12 @@ function startExamMode() {
     alert('Need at least 3 cards for an exam!');
     return;
   }
-  
+
   // Select random cards for the exam
   examCards = [...deck.cards]
     .sort(() => Math.random() - 0.5)
     .slice(0, Math.min(examSettings.questionCount, deck.cards.length));
-  
+
   // Initialize attempts for each card
   examAttempts = examCards.map(() => ({
     attempts: 0,
@@ -455,16 +740,16 @@ function startExamMode() {
     lastAttempt: null,
     hintShown: false
   }));
-  
+
   // Initialize exam state
   currentExamIndex = 0;
   examScore = 0;
   userExamAnswer = '';
-  
+
   // Setup timer
   examTimeLeft = examSettings.timeLimit;
   startExamTimer();
-  
+
   // Setup exam UI
   setupExamUI();
   loadExamQuestion();
@@ -475,39 +760,39 @@ function setupExamUI() {
   // Clear existing UI
   examQuestion.innerHTML = '';
   examOptions.innerHTML = '';
-  
+
   // Create answer input
   examAnswerInput.id = 'examAnswerInput';
   examAnswerInput.className = 'exam-answer-input';
   examAnswerInput.placeholder = 'Type your answer here...';
   examAnswerInput.rows = 4;
-  
+
   // Create check answer button
   checkAnswerBtn.id = 'checkAnswerBtn';
   checkAnswerBtn.className = 'primary-btn';
   checkAnswerBtn.innerHTML = '<i class="fas fa-check"></i> Check Answer';
-  
+
   // Create hint button
   showHintBtn.id = 'showHintBtn';
   showHintBtn.className = 'secondary-btn';
   showHintBtn.innerHTML = '<i class="fas fa-lightbulb"></i> Show Hint';
   showHintBtn.style.display = examSettings.showHint ? '' : 'none';
-  
+
   // Create hint container
   hintContainer.id = 'hintContainer';
   hintContainer.className = 'hint-container hidden';
-  
+
   // Create result container
   examResult.id = 'examResult';
   examResult.className = 'exam-result hidden';
-  
+
   // Add elements to exam container
   examQuestion.appendChild(examAnswerInput);
   examOptions.appendChild(checkAnswerBtn);
   examOptions.appendChild(showHintBtn);
   examOptions.appendChild(hintContainer);
   examOptions.appendChild(examResult);
-  
+
   // Set up event listeners for exam
   checkAnswerBtn.addEventListener('click', checkExamAnswer);
   showHintBtn.addEventListener('click', showHint);
@@ -523,41 +808,41 @@ function loadExamQuestion() {
     showExamResults();
     return;
   }
-  
+
   const card = examCards[currentExamIndex];
   const attempts = examAttempts[currentExamIndex];
-  
+
   // Clear previous state
   examAnswerInput.value = userExamAnswer;
   examResult.classList.add('hidden');
   hintContainer.classList.add('hidden');
   examResult.innerHTML = '';
-  
+
   // Update UI
   examProgress.textContent = `Question ${currentExamIndex + 1}/${examCards.length}`;
-  
+
   // Create question display
   const questionDisplay = document.createElement('div');
   questionDisplay.className = 'exam-question-display';
   questionDisplay.innerHTML = marked.parse(`**Question ${currentExamIndex + 1}:** ${card.front}`);
-  
+
   // Show attempts info
   const attemptsInfo = document.createElement('div');
   attemptsInfo.className = 'attempts-info';
   attemptsInfo.textContent = `Attempts: ${attempts.attempts}/${examSettings.maxAttempts}`;
-  
+
   // Clear question area and add new content
   const questionContainer = document.querySelector('.exam-question');
   questionContainer.innerHTML = '';
   questionContainer.appendChild(questionDisplay);
   questionContainer.appendChild(attemptsInfo);
   questionContainer.appendChild(examAnswerInput);
-  
+
   // Update buttons state
   checkAnswerBtn.disabled = false;
   checkAnswerBtn.innerHTML = '<i class="fas fa-check"></i> Check Answer';
   showHintBtn.disabled = attempts.hintShown;
-  
+
   // Focus answer input
   setTimeout(() => {
     examAnswerInput.focus();
@@ -567,14 +852,14 @@ function loadExamQuestion() {
 function showHint() {
   const card = examCards[currentExamIndex];
   const attempts = examAttempts[currentExamIndex];
-  
+
   if (attempts.hintShown) return;
-  
+
   // Create a hint (show first few words of answer)
   const answerWords = card.back.split(' ');
   const hintLength = Math.max(3, Math.floor(answerWords.length * 0.3));
   const hint = answerWords.slice(0, hintLength).join(' ') + '...';
-  
+
   hintContainer.innerHTML = `<strong>Hint:</strong> ${hint}`;
   hintContainer.classList.remove('hidden');
   attempts.hintShown = true;
@@ -584,21 +869,21 @@ function showHint() {
 function checkExamAnswer() {
   const card = examCards[currentExamIndex];
   const attempts = examAttempts[currentExamIndex];
-  
+
   userExamAnswer = examAnswerInput.value.trim();
-  
+
   if (!userExamAnswer) {
     alert('Please enter an answer!');
     return;
   }
-  
+
   attempts.attempts++;
   attempts.userAnswers.push(userExamAnswer);
   attempts.lastAttempt = new Date();
-  
+
   // Check if answer is correct (case-insensitive, allows for minor variations)
   const isCorrect = isAnswerCorrect(userExamAnswer, card.back);
-  
+
   if (isCorrect) {
     attempts.correct = true;
     examScore++;
@@ -616,28 +901,28 @@ function isAnswerCorrect(userAnswer, correctAnswer) {
   // Simple matching - can be enhanced for better matching
   const normalizedUser = userAnswer.toLowerCase().trim();
   const normalizedCorrect = correctAnswer.toLowerCase().trim();
-  
+
   // Exact match
   if (normalizedUser === normalizedCorrect) return true;
-  
+
   // Contains match (if user answer is part of correct answer or vice versa)
-  if (normalizedCorrect.includes(normalizedUser) || 
-      normalizedUser.includes(normalizedCorrect)) {
+  if (normalizedCorrect.includes(normalizedUser) ||
+    normalizedUser.includes(normalizedCorrect)) {
     return normalizedUser.length >= normalizedCorrect.length * 0.7; // At least 70% match
   }
-  
+
   // Word overlap (for longer answers)
   const userWords = new Set(normalizedUser.split(/\s+/));
   const correctWords = new Set(normalizedCorrect.split(/\s+/));
   const commonWords = [...userWords].filter(word => correctWords.has(word));
   const overlap = commonWords.length / correctWords.size;
-  
+
   return overlap >= 0.7; // At least 70% word overlap
 }
 
 function showAnswerResult(isCorrect, correctAnswer) {
   examResult.classList.remove('hidden');
-  
+
   if (isCorrect) {
     examResult.innerHTML = `
       <div class="result-correct">
@@ -647,7 +932,7 @@ function showAnswerResult(isCorrect, correctAnswer) {
       </div>
     `;
     examResult.className = 'exam-result result-correct';
-    
+
     // Auto-advance after delay if immediate feedback is enabled
     if (examSettings.immediateFeedback) {
       setTimeout(() => {
@@ -665,7 +950,7 @@ function showAnswerResult(isCorrect, correctAnswer) {
     `;
     examResult.className = 'exam-result result-incorrect';
   }
-  
+
   // Disable check button after max attempts
   const attempts = examAttempts[currentExamIndex];
   if (attempts.attempts >= examSettings.maxAttempts) {
@@ -676,7 +961,7 @@ function showAnswerResult(isCorrect, correctAnswer) {
 
 function showAttemptFeedback(isCorrect) {
   examResult.classList.remove('hidden');
-  
+
   if (isCorrect) {
     examResult.innerHTML = `
       <div class="result-attempt">
@@ -695,7 +980,7 @@ function showAttemptFeedback(isCorrect) {
     `;
   }
   examResult.className = 'exam-result result-attempt';
-  
+
   // Clear input for next attempt
   examAnswerInput.value = '';
   setTimeout(() => {
@@ -719,11 +1004,11 @@ function prevExamQuestion() {
 
 function showExamResults() {
   clearInterval(examTimer);
-  
+
   const totalQuestions = examCards.length;
   const percentage = Math.round((examScore / totalQuestions) * 100);
   const passed = percentage >= examSettings.passPercentage;
-  
+
   // Create detailed results
   let resultsHTML = `
     <h3>Exam Complete!</h3>
@@ -735,11 +1020,11 @@ function showExamResults() {
     <div class="detailed-results">
       <h4>Detailed Results:</h4>
   `;
-  
+
   examCards.forEach((card, index) => {
     const attempts = examAttempts[index];
     const isCorrect = attempts.correct;
-    
+
     resultsHTML += `
       <div class="question-result ${isCorrect ? 'correct' : 'incorrect'}">
         <strong>Q${index + 1}:</strong> ${card.front.substring(0, 50)}${card.front.length > 50 ? '...' : ''}
@@ -748,24 +1033,24 @@ function showExamResults() {
       </div>
     `;
   });
-  
+
   resultsHTML += '</div>';
-  
+
   examQuestion.innerHTML = resultsHTML;
   examOptions.innerHTML = '';
   examTimerElement.textContent = 'Exam Finished';
-  
+
   // Add review buttons
   const reviewBtn = document.createElement('button');
   reviewBtn.className = 'primary-btn';
   reviewBtn.innerHTML = '<i class="fas fa-redo"></i> Review Incorrect Cards';
   reviewBtn.addEventListener('click', reviewIncorrectCards);
-  
+
   const doneBtn = document.createElement('button');
   doneBtn.className = 'secondary-btn';
   doneBtn.innerHTML = '<i class="fas fa-home"></i> Return to Deck';
   doneBtn.addEventListener('click', exitExamMode);
-  
+
   examOptions.appendChild(reviewBtn);
   examOptions.appendChild(doneBtn);
 }
@@ -773,12 +1058,12 @@ function showExamResults() {
 function reviewIncorrectCards() {
   // Get incorrect cards
   const incorrectCards = examCards.filter((card, index) => !examAttempts[index].correct);
-  
+
   if (incorrectCards.length === 0) {
     alert('All cards were correct! Great job!');
     return;
   }
-  
+
   // Start a study session with incorrect cards
   examCards = incorrectCards;
   examAttempts = incorrectCards.map(() => ({
@@ -788,32 +1073,32 @@ function reviewIncorrectCards() {
     lastAttempt: null,
     hintShown: false
   }));
-  
+
   currentExamIndex = 0;
   examScore = 0;
   userExamAnswer = '';
-  
+
   // Reset timer for review
   examTimeLeft = Math.min(incorrectCards.length * 60, 600); // 1 min per card, max 10 min
   startExamTimer();
-  
+
   setupExamUI();
   loadExamQuestion();
 }
 
 function startExamTimer() {
   clearInterval(examTimer);
-  
+
   examTimer = setInterval(() => {
     examTimeLeft--;
     updateExamTimerDisplay();
-    
+
     if (examTimeLeft <= 0) {
       clearInterval(examTimer);
       // Auto-submit exam when time runs out
       showExamResults();
     }
-    
+
     // Add warning class when time is running out
     if (examTimeLeft <= 300) { // 5 minutes
       examTimerElement.classList.add('warning');
@@ -838,7 +1123,7 @@ function switchScreen(from, to) {
   from.classList.add('hidden');
   to.classList.remove('hidden');
 
-   // Special handling for exam screen
+  // Special handling for exam screen
   if (to === examScreen) {
     // Reset exam UI if needed
     examTimerElement.classList.remove('warning');
@@ -849,42 +1134,7 @@ function switchScreen(from, to) {
   }
 }
 
-function saveDecks() {
-  localStorage.setItem('flashcardDecks', JSON.stringify(decks));
-  localStorage.setItem('examSettings', JSON.stringify(examSettings));
-}
 
-function exportDecks() {
-  const data = JSON.stringify(decks, null, 2);
-  const blob = new Blob([data], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'flashcard-decks.json';
-  a.click();
-}
-
-function importDecks() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.json';
-  input.onchange = e => {
-    const file = e.target.files[0];
-    const reader = new FileReader();
-    reader.onload = event => {
-      try {
-        decks = JSON.parse(event.target.result);
-        saveDecks();
-        renderDecks();
-        alert('Decks imported successfully!');
-      } catch (error) {
-        alert('Invalid file format!');
-      }
-    };
-    reader.readAsText(file);
-  };
-  input.click();
-}
 
 function toggleTheme() {
   document.body.classList.toggle('dark-mode');
@@ -897,38 +1147,104 @@ function toggleTheme() {
   }
 }
 
-// ===== Event Listeners =====
-function setupEventListeners() {
-  // Deck Screen
-  document.getElementById('newDeckBtn').addEventListener('click', createNewDeck);
-  
-  // Editor Screen
-  document.getElementById('addCardBtn').addEventListener('click', addNewCard);
-  document.getElementById('studyBtn').addEventListener('click', startStudyMode);
-  document.getElementById('quizBtn').addEventListener('click', startQuizMode);
-  document.getElementById('examBtn').addEventListener('click', showExamSettings);
-  document.getElementById('backToDecksBtn').addEventListener('click', () => {
-    switchScreen(editorScreen, deckScreen);
-  });
-  
-  // Study Screen
-  document.getElementById('flipCardBtn').addEventListener('click', flipCard);
-  document.getElementById('shuffleBtn').addEventListener('click', shuffleCards);
-  document.getElementById('exitStudyBtn').addEventListener('click', exitStudyMode);
-  document.getElementById('nextCardBtn').addEventListener('click', nextCard);
-  document.getElementById('prevCardBtn').addEventListener('click', prevCard);
-  
-  // Quiz Screen
-  document.getElementById('nextQuizBtn').addEventListener('click', nextQuizQuestion);
-  document.getElementById('exitQuizBtn').addEventListener('click', exitQuizMode);
+// ===== Mastery Review Mode =====
+let masteryCards = [];
+let masteryCurrentCard = null;
 
-  // Exam Screen
-  document.getElementById('prevExamBtn').addEventListener('click', prevExamQuestion);
-  document.getElementById('nextExamBtn').addEventListener('click', nextExamQuestion);
-  document.getElementById('exitExamBtn').addEventListener('click', exitExamMode);
-  
-  // Header Actions
-  document.getElementById('toggleThemeBtn').addEventListener('click', toggleTheme);
-  document.getElementById('exportBtn').addEventListener('click', exportDecks);
-  document.getElementById('importBtn').addEventListener('click', importDecks);
+const masteryScreen = document.getElementById('masteryScreen');
+const masteryCard = document.getElementById('masteryCard');
+const masteryFront = document.getElementById('masteryFront');
+const masteryBack = document.getElementById('masteryBack');
+const masteryCount = document.getElementById('masteryCount');
+const masteryControls = document.getElementById('masteryControls');
+const showMasteryAnswerBtn = document.getElementById('showMasteryAnswerBtn');
+const gradingButtons = document.getElementById('gradingButtons');
+
+function startMasteryMode(initialCards = null) {
+  const deck = decks.find(d => d.id === currentDeckId);
+
+  if (!initialCards) {
+    // If no specific cards passed, use whole deck
+    if (deck.cards.length === 0) {
+      alert('Add cards first!');
+      return;
+    }
+    masteryCards = [...deck.cards];
+  } else {
+    masteryCards = [...initialCards];
+  }
+
+  // Shuffle initially
+  for (let i = masteryCards.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [masteryCards[i], masteryCards[j]] = [masteryCards[j], masteryCards[i]];
+  }
+
+  loadNextMasteryCard();
+  switchScreen(editorScreen, masteryScreen);
 }
+
+function loadNextMasteryCard() {
+  if (masteryCards.length === 0) {
+    showMasterySuccess();
+    return;
+  }
+
+  masteryCurrentCard = masteryCards[0]; // Take from top
+  masteryCount.textContent = masteryCards.length;
+
+  masteryFront.innerHTML = marked.parse(masteryCurrentCard.front);
+  masteryBack.innerHTML = marked.parse(masteryCurrentCard.back);
+
+  masteryCard.classList.remove('flipped');
+  showMasteryAnswerBtn.classList.remove('hidden');
+  gradingButtons.classList.add('hidden');
+}
+
+function showMasteryAnswer() {
+  masteryCard.classList.add('flipped');
+  showMasteryAnswerBtn.classList.add('hidden');
+  gradingButtons.classList.remove('hidden');
+}
+
+function handleMasteryGrade(isCorrect) {
+  // Remove current card from top
+  const current = masteryCards.shift();
+
+  if (!isCorrect) {
+    // If wrong, push back to end (or random position) to review again
+    masteryCards.push(current);
+  }
+
+  loadNextMasteryCard();
+}
+
+function showMasterySuccess() {
+  masteryCard.innerHTML = `
+    <div style="text-align: center; padding: 20px;">
+      <i class="fas fa-trophy" style="font-size: 4rem; color: #FFD700; margin-bottom: 20px;"></i>
+      <h3>Mastery Achieved!</h3>
+      <p>You've reviewed every card correctly.</p>
+    </div>
+  `;
+  masteryControls.innerHTML = `<button id="finishMasteryBtn" class="primary-btn">Finish Review</button>`;
+  document.getElementById('finishMasteryBtn').addEventListener('click', exitMasteryMode);
+}
+
+function exitMasteryMode() {
+  // Restore original controls html if we overwrote it
+  masteryControls.innerHTML = `
+    <button id="showMasteryAnswerBtn" class="primary-btn">Show Answer</button>
+    <div class="grading-buttons hidden" id="gradingButtons">
+      <button id="markWrongBtn" class="grade-btn wrong"><i class="fas fa-times"></i> Need Practice</button>
+      <button id="markRightBtn" class="grade-btn right"><i class="fas fa-check"></i> I Knew It</button>
+    </div>
+  `;
+  // Re-attach listeners since we overwrote HTML
+  document.getElementById('showMasteryAnswerBtn').addEventListener('click', showMasteryAnswer);
+  document.getElementById('markWrongBtn').addEventListener('click', () => handleMasteryGrade(false));
+  document.getElementById('markRightBtn').addEventListener('click', () => handleMasteryGrade(true));
+
+  switchScreen(masteryScreen, editorScreen);
+}
+

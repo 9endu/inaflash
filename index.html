@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="styles.css">
 </head>
+
 <body class="light-mode">
   <div class="app">
     <!-- Header -->
@@ -14,13 +16,54 @@
       <h1><i class="fas fa-layer-group"></i> Ultimate Flashcards</h1>
       <div class="header-actions">
         <button id="toggleThemeBtn"><i class="fas fa-moon"></i></button>
-        <button id="importBtn"><i class="fas fa-file-import"></i> Import</button>
-        <button id="exportBtn"><i class="fas fa-file-export"></i> Export</button>
+        <div id="userActions" class="hidden">
+          <span id="userEmail" style="margin-right: 10px;"></span>
+          <button id="logoutBtn" class="secondary-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        </div>
       </div>
     </header>
 
+    <!-- Home Screen (Landing Page) -->
+    <div class="screen" id="homeScreen">
+      <div class="landing-content">
+        <div class="landing-hero">
+          <h1>Master Your Studies with Ultimate Flashcards</h1>
+          <p>Create, study, and ace your exams with our powerful spaced repetition system.</p>
+          <div class="landing-actions">
+            <button id="getStartedBtn" class="primary-btn landing-btn">Get Started</button>
+            <button id="loginBtn" class="secondary-btn landing-btn">Login</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auth Screen -->
+    <div class="screen hidden" id="authScreen">
+      <div class="auth-container">
+        <div class="auth-box">
+          <h2 id="authTitle">Login</h2>
+          <form id="authForm">
+            <div class="form-group">
+              <label for="email">Email</label>
+              <input type="email" id="email" required placeholder="Enter your email">
+            </div>
+            <div class="form-group">
+              <label for="password">Password</label>
+              <input type="password" id="password" required placeholder="Enter your password">
+            </div>
+            <button type="submit" class="primary-btn full-width" id="authSubmitBtn">Login</button>
+          </form>
+          <p class="auth-switch">
+            <span id="authSwitchText">Don't have an account?</span>
+            <a href="#" id="authSwitchBtn">Sign Up</a>
+          </p>
+          <button id="backToHomeBtn" class="text-btn">Back to Home</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Deck Selection Screen -->
-    <div class="screen" id="deckScreen">
+    <div class="screen hidden" id="deckScreen">
       <div class="decks" id="decksContainer"></div>
       <button id="newDeckBtn" class="primary-btn"><i class="fas fa-plus"></i> New Deck</button>
     </div>
@@ -33,6 +76,8 @@
           <button id="studyBtn" class="primary-btn"><i class="fas fa-book-open"></i> Study</button>
           <button id="quizBtn" class="primary-btn"><i class="fas fa-question-circle"></i> Quiz</button>
           <button id="examBtn" class="primary-btn"><i class="fas fa-graduation-cap"></i> Exam</button>
+          <button id="masteryBtn" class="primary-btn" style="background-color: #9c27b0;"><i class="fas fa-brain"></i>
+            Mastery</button>
           <button id="backToDecksBtn"><i class="fas fa-arrow-left"></i> Decks</button>
         </div>
       </div>
@@ -98,8 +143,42 @@
         <div class="exam-score hidden" id="examScore">Score: 0/0 (0%)</div>
       </div>
     </div>
+
+    <!-- Mastery Mode Screen -->
+    <div class="screen hidden" id="masteryScreen">
+      <div class="study-header">
+        <h2>Mastery Review</h2>
+        <button id="exitMasteryBtn"><i class="fas fa-times"></i> Exit</button>
+      </div>
+      <div class="mastery-container">
+        <div class="mastery-progress">Remaining Cards: <span id="masteryCount">0</span></div>
+
+        <div class="flashcard-container">
+          <div class="flashcard" id="masteryCard">
+            <div class="card-face front" id="masteryFront"></div>
+            <div class="card-face back" id="masteryBack"></div>
+          </div>
+        </div>
+
+        <div class="mastery-controls" id="masteryControls">
+          <button id="showMasteryAnswerBtn" class="primary-btn">Show Answer</button>
+          <div class="grading-buttons hidden" id="gradingButtons">
+            <button id="markWrongBtn" class="grade-btn wrong"><i class="fas fa-times"></i> Need Practice</button>
+            <button id="markRightBtn" class="grade-btn right"><i class="fas fa-check"></i> I Knew It</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+  <script src="firebase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="script.js"></script>
 </body>
+
 </html>
