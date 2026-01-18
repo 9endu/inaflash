@@ -88,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
       userActions.classList.remove('hidden');
     } else {
       // No user is signed in.
+      if (unsubscribeDecks) unsubscribeDecks(); // Stop listening to data
       showHome();
       userActions.classList.add('hidden');
     }
@@ -266,11 +267,9 @@ function subscribeToDecks() {
       }
     }
   }, error => {
-    console.error("Error fetching decks: ", error);
-    if (error.code === 'permission-denied') {
-      alert("Database Access Denied: \nPlease go to Firebase Console > Firestore Database > Rules and allow access. (See the 'Missing Permissions' section in the guide I sent).");
-    } else {
-      alert("Error loading data: " + error.message);
+    // Silent error on permission denied (usually logout race condition)
+    if (error.code !== 'permission-denied') {
+      console.error("Error fetching decks: ", error);
     }
   });
 }
