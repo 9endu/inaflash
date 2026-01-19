@@ -1,3 +1,5 @@
+const auth = window.auth;
+const db = window.db;
 // ===== App State =====
 let decks = [];
 let currentDeckId = null;
@@ -79,7 +81,12 @@ const examResult = document.createElement('div');
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
   // Check Auth State
-  auth.onAuthStateChanged(firebaseUser => {
+  if (!window.auth) {
+    console.error("CRITICAL ERROR: window.auth is undefined during DOMContentLoaded!");
+    alert("Error: Firebase Auth not initialized. Check console for details.");
+    return;
+  }
+  window.auth.onAuthStateChanged(firebaseUser => {
     user = firebaseUser;
     if (user) {
       // User is signed in.
@@ -154,9 +161,9 @@ async function handleAuth(e) {
 
   try {
     if (isLoginMode) {
-      await auth.signInWithEmailAndPassword(email, password);
+      await window.auth.signInWithEmailAndPassword(email, password);
     } else {
-      await auth.createUserWithEmailAndPassword(email, password);
+      await window.auth.createUserWithEmailAndPassword(email, password);
     }
     // Success: State change listener handles redirect
   } catch (error) {
@@ -168,7 +175,7 @@ async function handleAuth(e) {
 }
 
 function signOut() {
-  auth.signOut();
+  window.auth.signOut();
 }
 
 function setupEventListeners() {
