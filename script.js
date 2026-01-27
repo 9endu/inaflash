@@ -204,7 +204,7 @@ function setupEventListeners() {
   document.getElementById('studyBtn').addEventListener('click', startStudyMode);
   document.getElementById('quizBtn').addEventListener('click', startQuizMode);
   document.getElementById('examBtn').addEventListener('click', showExamSettings);
-  document.getElementById('masteryBtn').addEventListener('click', () => startMasteryMode());
+  document.getElementById('cramBtn').addEventListener('click', () => startCramMode());
 
   // Theme
   document.getElementById('toggleThemeBtn').addEventListener('click', toggleTheme);
@@ -226,11 +226,11 @@ function setupEventListeners() {
   document.getElementById('exitExamBtn').addEventListener('click', exitExamMode);
   document.getElementById('submitExamBtn').addEventListener('click', showExamResults);
 
-  // Mastery Mode controls
-  document.getElementById('showMasteryAnswerBtn').addEventListener('click', showMasteryAnswer);
-  document.getElementById('markWrongBtn').addEventListener('click', () => handleMasteryGrade(false));
-  document.getElementById('markRightBtn').addEventListener('click', () => handleMasteryGrade(true));
-  document.getElementById('exitMasteryBtn').addEventListener('click', exitMasteryMode);
+  // Cram Mode controls
+  document.getElementById('showCramAnswerBtn').addEventListener('click', showCramAnswer);
+  document.getElementById('markWrongBtn').addEventListener('click', () => handleCramGrade(false));
+  document.getElementById('markRightBtn').addEventListener('click', () => handleCramGrade(true));
+  document.getElementById('exitCramBtn').addEventListener('click', exitCramMode);
 }
 
 // Load exam settings if saved
@@ -1153,104 +1153,182 @@ function toggleTheme() {
   }
 }
 
-// ===== Mastery Review Mode =====
-let masteryCards = [];
-let masteryCurrentCard = null;
+// ===== Cram Mode (formerly Mastery Reivew) =====
+let cramCards = [];
+let cramCurrentCard = null;
+let cramWrongCards = new Set(); // Track unique cards marked wrong at least once
 
-const masteryScreen = document.getElementById('masteryScreen');
-const masteryCard = document.getElementById('masteryCard');
-const masteryFront = document.getElementById('masteryFront');
-const masteryBack = document.getElementById('masteryBack');
-const masteryCount = document.getElementById('masteryCount');
-const masteryControls = document.getElementById('masteryControls');
-const showMasteryAnswerBtn = document.getElementById('showMasteryAnswerBtn');
+const cramScreen = document.getElementById('cramScreen');
+const cramCard = document.getElementById('cramCard');
+const cramFront = document.getElementById('cramFront');
+const cramBack = document.getElementById('cramBack');
+const cramCount = document.getElementById('cramCount');
+const cramControls = document.getElementById('cramControls');
+const showCramAnswerBtn = document.getElementById('showCramAnswerBtn');
 const gradingButtons = document.getElementById('gradingButtons');
+const cramHardBadge = document.getElementById('cramHardBadge');
+const cramSessionType = document.getElementById('cramSessionType');
 
-function startMasteryMode(initialCards = null) {
+
+function startCramMode(initialCards = null, isRetry = false) {
   const deck = decks.find(d => d.id === currentDeckId);
 
   if (!initialCards) {
-    // If no specific cards passed, use whole deck
     if (deck.cards.length === 0) {
       alert('Add cards first!');
       return;
     }
-    masteryCards = [...deck.cards];
+    // Deep copy and add tracking props
+    cramCards = deck.cards.map(c => ({ ...c,
+      sessionWrongs: 0
+    }));
+    cramWrongCards.clear();
+    cramSessionType.textContent = "Full Review";
   } else {
-    masteryCards = [...initialCards];
+    // Retry mode
+    cramCards = initialCards.map(c => ({ ...c,
+      sessionWrongs: 0
+    })); // Reset session wrongs for new session, but we know they are hard
+    cramSessionType.textContent = "Hard Cards Only";
   }
 
-  // Shuffle initially
-  for (let i = masteryCards.length - 1; i > 0; i--) {
+  // Initial Shuffle (unless it's a very small retry, but consistent shuffle is good)
+  for (let i = cramCards.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [masteryCards[i], masteryCards[j]] = [masteryCards[j], masteryCards[i]];
+    [cramCards[i], cramCards[j]] = [cramCards[j], cramCards[i]];
   }
 
-  loadNextMasteryCard();
-  switchScreen(editorScreen, masteryScreen);
+  loadNextCramCard();
+  switchScreen(editorScreen, cramScreen);
 }
 
-function loadNextMasteryCard() {
-  if (masteryCards.length === 0) {
-    showMasterySuccess();
+function loadNextCramCard() {
+  if (cramCards.length === 0) {
+    showCramSuccess();
     return;
   }
 
-  masteryCurrentCard = masteryCards[0]; // Take from top
-  masteryCount.textContent = masteryCards.length;
+  cramCurrentCard = cramCards[0]; // Peek at top (don't shift yet, wait for grade)
+  cramCount.textContent = cramCards.length;
 
-  masteryFront.innerHTML = marked.parse(masteryCurrentCard.front);
-  masteryBack.innerHTML = marked.parse(masteryCurrentCard.back);
+  cramFront.innerHTML = marked.parse(cramCurrentCard.front);
+  cramBack.innerHTML = marked.parse(cramCurrentCard.back);
 
-  masteryCard.classList.remove('flipped');
-  showMasteryAnswerBtn.classList.remove('hidden');
+  // Hard Card Logic: Show badge if marked wrong > 1 time in this session
+  // OR if we want to retain "hard" status from previous session, we'd need permanent storage.
+  // For now, "Hard Card" is within the context of the current cram session.
+  if (cramCurrentCard.sessionWrongs > 1) {
+    cramHardBadge.classList.remove('hidden');
+  } else {
+    cramHardBadge.classList.add('hidden');
+  }
+
+  cramCard.classList.remove('flipped');
+  showCramAnswerBtn.classList.remove('hidden');
   gradingButtons.classList.add('hidden');
 }
 
-function showMasteryAnswer() {
-  masteryCard.classList.add('flipped');
-  showMasteryAnswerBtn.classList.add('hidden');
+function showCramAnswer() {
+  cramCard.classList.add('flipped');
+  showCramAnswerBtn.classList.add('hidden');
   gradingButtons.classList.remove('hidden');
 }
 
-function handleMasteryGrade(isCorrect) {
+function handleCramGrade(isRight) {
   // Remove current card from top
-  const current = masteryCards.shift();
+  const current = cramCards.shift();
 
-  if (!isCorrect) {
-    // If wrong, push back to end (or random position) to review again
-    masteryCards.push(current);
+  if (isRight) {
+    // Done with this card for this session
+    // Nothing to do, it's already removed
+  } else {
+    // Was Wrong
+    current.sessionWrongs = (current.sessionWrongs || 0) + 1;
+    cramWrongCards.add(current); // Track for potential retry
+
+    // Reinsertion Logic:
+    // Insert 3 to 8 spots ahead, or at end if <3 cards left
+    const remaining = cramCards.length;
+    let insertIndex;
+
+    if (remaining <= 1) {
+      insertIndex = remaining; // End
+    } else {
+      const minOffset = 3;
+      const maxOffset = 8;
+      // If we have fewer than minOffset, just put at end.
+      // If we have more, pick random spot between min and max (clamped by length)
+      const offset = Math.floor(Math.random() * (maxOffset - minOffset + 1)) + minOffset;
+      insertIndex = Math.min(offset, remaining);
+    }
+
+    cramCards.splice(insertIndex, 0, current);
   }
 
-  loadNextMasteryCard();
+  loadNextCramCard();
 }
 
-function showMasterySuccess() {
-  masteryCard.innerHTML = `
+function showCramSuccess() {
+  const wrongsCount = cramWrongCards.size;
+
+  let html = `
     <div style="text-align: center; padding: 20px;">
-      <i class="fas fa-trophy" style="font-size: 4rem; color: #FFD700; margin-bottom: 20px;"></i>
-      <h3>Mastery Achieved!</h3>
-      <p>You've reviewed every card correctly.</p>
-    </div>
+      <i class="fas fa-fire" style="font-size: 4rem; color: #ff5722; margin-bottom: 20px;"></i>
+      <h3>Cram Session Complete!</h3>
+      <p>Card queue is empty.</p>
   `;
-  masteryControls.innerHTML = `<button id="finishMasteryBtn" class="primary-btn">Finish Review</button>`;
-  document.getElementById('finishMasteryBtn').addEventListener('click', exitMasteryMode);
+
+  if (wrongsCount > 0) {
+    html += `
+      <p style="margin-top: 10px; color: #f44336;">Make sure to review the ${wrongsCount} cards you missed.</p>
+    `;
+  } else {
+    html += `<p style="margin-top: 10px; color: #4CAF50;">Perfect run! No cards marked wrong.</p>`;
+  }
+
+  html += `</div>`;
+  cramCard.innerHTML = html;
+
+  // Buttons
+  let controlsHtml = `
+    <button id="finishCramBtn" class="primary-btn">Finish</button>
+  `;
+
+  if (wrongsCount > 0) {
+    controlsHtml += `
+      <button id="retryWeakBtn" class="primary-btn" style="background-color: #f44336; margin-left: 10px;">
+        <i class="fas fa-redo"></i> Cram Weak Cards (${wrongsCount})
+      </button>
+    `;
+  }
+
+  cramControls.innerHTML = controlsHtml;
+
+  document.getElementById('finishCramBtn').addEventListener('click', exitCramMode);
+
+  if (wrongsCount > 0) {
+    document.getElementById('retryWeakBtn').addEventListener('click', () => {
+      // Convert Set to Array
+      const weakCards = Array.from(cramWrongCards);
+      startCramMode(weakCards, true);
+    });
+  }
 }
 
-function exitMasteryMode() {
-  // Restore original controls html if we overwrote it
-  masteryControls.innerHTML = `
-    <button id="showMasteryAnswerBtn" class="primary-btn">Show Answer</button>
+function exitCramMode() {
+  // Restore original controls html
+  cramControls.innerHTML = `
+    <button id="showCramAnswerBtn" class="primary-btn">Show Answer</button>
     <div class="grading-buttons hidden" id="gradingButtons">
-      <button id="markWrongBtn" class="grade-btn wrong"><i class="fas fa-times"></i> Need Practice</button>
-      <button id="markRightBtn" class="grade-btn right"><i class="fas fa-check"></i> I Knew It</button>
+      <button id="markWrongBtn" class="grade-btn wrong"><i class="fas fa-times"></i> Was Wrong</button>
+      <button id="markRightBtn" class="grade-btn right"><i class="fas fa-check"></i> Got It Right</button>
     </div>
   `;
-  // Re-attach listeners since we overwrote HTML
-  document.getElementById('showMasteryAnswerBtn').addEventListener('click', showMasteryAnswer);
-  document.getElementById('markWrongBtn').addEventListener('click', () => handleMasteryGrade(false));
-  document.getElementById('markRightBtn').addEventListener('click', () => handleMasteryGrade(true));
+  // Re-attach listeners
+  document.getElementById('showCramAnswerBtn').addEventListener('click', showCramAnswer);
+  document.getElementById('markWrongBtn').addEventListener('click', () => handleCramGrade(false));
+  document.getElementById('markRightBtn').addEventListener('click', () => handleCramGrade(true));
 
-  switchScreen(masteryScreen, editorScreen);
+  switchScreen(cramScreen, editorScreen);
 }
 
