@@ -100,7 +100,12 @@ document.addEventListener('DOMContentLoaded', () => {
       userActions.classList.add('hidden');
     }
   });
+  document.getElementById('toggleThemeBtn').addEventListener('click', toggleTheme);
+
+  // Call setupEventListeners after DOM is ready
+  setupEventListeners();
 });
+
 
 // ... inside subscribeToDecks ...
 function subscribeToDecks() {
@@ -129,10 +134,11 @@ function subscribeToDecks() {
   });
 }
 
-setupEventListeners();
+
 
 // ===== Auth Functions =====
 let isLoginMode = true;
+
 
 function toggleAuthMode() {
   isLoginMode = !isLoginMode;
@@ -1179,14 +1185,16 @@ function startCramMode(initialCards = null, isRetry = false) {
       return;
     }
     // Deep copy and add tracking props
-    cramCards = deck.cards.map(c => ({ ...c,
+    cramCards = deck.cards.map(c => ({
+      ...c,
       sessionWrongs: 0
     }));
     cramWrongCards.clear();
     cramSessionType.textContent = "Full Review";
   } else {
     // Retry mode
-    cramCards = initialCards.map(c => ({ ...c,
+    cramCards = initialCards.map(c => ({
+      ...c,
       sessionWrongs: 0
     })); // Reset session wrongs for new session, but we know they are hard
     cramSessionType.textContent = "Hard Cards Only";
