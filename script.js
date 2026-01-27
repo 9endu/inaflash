@@ -141,7 +141,9 @@ let isLoginMode = true;
 
 
 function toggleAuthMode() {
+  console.log("toggleAuthMode called. Current mode:", isLoginMode);
   isLoginMode = !isLoginMode;
+  console.log("New mode:", isLoginMode);
   if (isLoginMode) {
     authTitle.textContent = "Login";
     authSubmitBtn.textContent = "Login";
@@ -157,6 +159,7 @@ function toggleAuthMode() {
 
 async function handleAuth(e) {
   e.preventDefault();
+  console.log("handleAuth submitted. Mode:", isLoginMode ? "Login" : "SignUp");
   const email = document.getElementById('email').value;
   const password = document.getElementById('password').value;
 
@@ -188,10 +191,16 @@ function setupEventListeners() {
   // Auth Listeners
   if (getStartedBtn) getStartedBtn.addEventListener('click', showAuth);
   if (loginBtn) loginBtn.addEventListener('click', showAuth);
-  if (authSwitchBtn) authSwitchBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    toggleAuthMode();
-  });
+  if (authSwitchBtn) {
+    console.log("Adding listener to authSwitchBtn");
+    authSwitchBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      console.log("authSwitchBtn clicked");
+      toggleAuthMode();
+    });
+  } else {
+    console.error("authSwitchBtn element NOT found!");
+  }
   if (authForm) authForm.addEventListener('submit', handleAuth);
   if (backToHomeBtn) backToHomeBtn.addEventListener('click', showHome);
   if (logoutBtn) logoutBtn.addEventListener('click', signOut);
