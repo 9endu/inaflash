@@ -220,6 +220,7 @@ function setupEventListeners() {
   document.getElementById('quizBtn').addEventListener('click', startQuizMode);
   document.getElementById('examBtn').addEventListener('click', showExamSettings);
   document.getElementById('cramBtn').addEventListener('click', () => startCramMode());
+  document.getElementById('scheduleBtn').addEventListener('click', scheduleRevision);
 
   // Theme
   document.getElementById('toggleThemeBtn').addEventListener('click', toggleTheme);
@@ -424,46 +425,39 @@ async function deleteDeck(deckId) {
 }
 
 async function createNewDeck() {
-  log("Step 1: Button Clicked");
+  console.log("Step 1: Button Clicked");
   const deckName = prompt('Enter deck name:');
 
   if (deckName) {
-    log("Step 2: Name entered: " + deckName);
+    console.log("Step 2: Name entered: " + deckName);
 
     if (!user) {
-      log("Error: No user logged in!");
+      console.log("Error: No user logged in!");
       alert("Error: No user logged in!");
       return;
     }
-    log("Step 3: User ID is " + user.uid);
+    console.log("Step 3: User ID is " + user.uid);
 
     try {
-      log("Step 4: Attempting to write to Firestore...");
+      console.log("Step 4: Attempting to write to Firestore...");
 
-      // Create a timeout promise
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Connection Timed Out. \n\nPOSSIBLE CAUSES:\n1. Firestore Database is NOT CREATED in Firebase Console.\n2. Internet connection issue.\n3. Firewall blocking Firestore.")), 5000);
+      // Simple add call without aggressive timeout race for now, 
+      // as standard Firestore calls handle offline/latency better natively.
+      await db.collection('users').doc(user.uid).collection('decks').add({
+        name: deckName,
+        cards: [],
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
 
-      // Race the write against the timeout
-      await Promise.race([
-        db.collection('users').doc(user.uid).collection('decks').add({
-          name: deckName,
-          cards: [],
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        }),
-        timeoutPromise
-      ]);
-
-      log("Step 5: Success! Deck saved.");
+      console.log("Step 5: Success! Deck saved.");
       // Listener updates UI
     } catch (e) {
       console.error("Error creating deck:", e);
-      log("Step 5 Failed: " + e.message);
-      alert("Step 5 Failed: " + e.message);
+      console.log("Step 5 Failed: " + e.message);
+      alert("Failed to create deck: " + e.message);
     }
   } else {
-    log("Cancelled or empty name");
+    console.log("Cancelled or empty name");
   }
 }
 
@@ -607,6 +601,31 @@ function shuffleCards() {
 
 function exitStudyMode() {
   switchScreen(studyScreen, editorScreen);
+}
+
+function scheduleRevision() {
+  const deck = decks.find(d => d.id === currentDeckId);
+  if (!deck) return;
+
+  const title = encodeURIComponent(`Revise ${deck.name}`);
+  const details = encodeURIComponent("Time to study your flashcards!");
+
+  // Calculate dates (Default: Tomorrow at 9:00 AM to 10:00 AM)
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(9, 0, 0, 0);
+
+  const endTime = new Date(tomorrow);
+  endTime.setHours(10, 0, 0, 0);
+
+  // Format dates for Google Calendar: YYYYMMDDTHHMMSS
+  const formatTime = (date) => date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+  const dates = `${formatTime(tomorrow)}/${formatTime(endTime)}`;
+
+  const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&dates=${dates}`;
+
+  window.open(url, '_blank');
 }
 
 // ===== Quiz Mode =====
