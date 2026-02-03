@@ -223,6 +223,67 @@
         </div>
       </div>
     </div>
+
+    <!-- Stats Screen -->
+    <div class="screen hidden" id="statsScreen">
+      <div class="editor-header">
+        <h2>Your Progress</h2>
+        <button id="backToDeckFromStatsBtn"><i class="fas fa-arrow-left"></i> Back</button>
+      </div>
+      <div class="stats-container">
+        <div class="stats-summary">
+          <div class="stat-card">
+            <h3>Today's Sessions</h3>
+            <span id="todaySessionCount" class="stat-value">0</span>
+            <p>Pomodoro blocks completed</p>
+          </div>
+        </div>
+
+        <div class="chart-section">
+          <h3>Last 7 Days</h3>
+          <div class="bar-chart" id="weeklyChart">
+            <!-- Bars injected via JS -->
+          </div>
+        </div>
+
+        <div class="motivation-box" id="motivationBox">
+          <i class="fas fa-lightbulb"></i>
+          <p id="motivationText">Keep going! Consistency is key.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- Floating Pomodoro Widget -->
+  <div id="pomodoroWidget" class="pomodoro-widget collapsed">
+    <!-- Collapsed Button -->
+    <button id="pomoToggleBtn" class="pomo-fab" title="Open Pomodoro Timer">
+      <i class="fas fa-stopwatch"></i>
+    </button>
+
+    <!-- Expanded Card -->
+    <div class="pomo-card">
+      <div class="pomo-header">
+        <h3>Pomodoro</h3>
+        <div class="pomo-header-actions">
+          <button id="pomoStatsBtn" class="icon-btn" title="View Stats"><i class="fas fa-chart-bar"></i></button>
+          <button id="pomoCloseBtn" class="icon-btn"><i class="fas fa-chevron-down"></i></button>
+        </div>
+      </div>
+      <div class="pomo-display">
+        <span id="pomoTime">25:00</span>
+      </div>
+      <div class="pomo-controls">
+        <button id="pomoStartBtn" class="primary-btn small-btn"><i class="fas fa-play"></i> Start</button>
+        <button id="pomoResetBtn" class="secondary-btn small-btn"><i class="fas fa-redo"></i> Reset</button>
+      </div>
+      <div class="pomo-modes">
+        <button class="pomo-mode-btn active" data-mode="work">Work</button>
+        <button class="pomo-mode-btn" data-mode="short">Short Break</button>
+        <button class="pomo-mode-btn" data-mode="long">Long Break</button>
+      </div>
+    </div>
   </div>
 
   <!-- Firebase SDKs -->

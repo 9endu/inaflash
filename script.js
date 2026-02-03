@@ -17,6 +17,12 @@ let canvas = null;
 let ctx = null;
 let worker = null; // Tesseract worker
 
+// ===== Pomodoro State =====
+let pomoTime = 1500; // 25 mins
+let pomoRunning = false;
+let pomoInterval = null;
+let pomoMode = 'work'; // work, short, long
+
 // ... (retain existing quiz/exam state variables) ...
 
 // ... (retain existing quiz/exam state variables) ...
@@ -53,6 +59,23 @@ const pdfCanvas = document.getElementById('pdfCanvas');
 const ocrText = document.getElementById('ocrText');
 const ocrOverlay = document.getElementById('ocrOverlay');
 const ocrResultContainer = document.getElementById('ocrResultContainer');
+
+// Stats DOM
+const statsBtn = document.getElementById('pomoStatsBtn');
+const statsScreen = document.getElementById('statsScreen');
+const todaySessionCount = document.getElementById('todaySessionCount');
+const weeklyChart = document.getElementById('weeklyChart');
+const motivationText = document.getElementById('motivationText');
+const backToDeckFromStatsBtn = document.getElementById('backToDeckFromStatsBtn');
+
+// Pomodoro DOM
+const pomodoroWidget = document.getElementById('pomodoroWidget');
+const pomoToggleBtn = document.getElementById('pomoToggleBtn');
+const pomoCloseBtn = document.getElementById('pomoCloseBtn');
+const pomoTimeDisplay = document.getElementById('pomoTime');
+const pomoStartBtn = document.getElementById('pomoStartBtn');
+const pomoResetBtn = document.getElementById('pomoResetBtn');
+const pomoModeBtns = document.querySelectorAll('.pomo-mode-btn');
 
 // Auth DOM
 const getStartedBtn = document.getElementById('getStartedBtn');
@@ -278,6 +301,21 @@ function setupEventListeners() {
   document.getElementById('closeOcrBtn').addEventListener('click', () => {
     ocrResultContainer.classList.add('hidden');
   });
+
+  // Pomodoro Listeners
+  pomoToggleBtn.addEventListener('click', togglePomoWidget);
+  pomoCloseBtn.addEventListener('click', togglePomoWidget);
+  pomoStartBtn.addEventListener('click', togglePomoTimer);
+  pomoResetBtn.addEventListener('click', resetPomoTimer);
+  pomoModeBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => switchPomoMode(e.target.dataset.mode));
+  });
+
+  // Stats Listeners
+  statsBtn.addEventListener('click', showStats);
+  backToDeckFromStatsBtn.addEventListener('click', () => {
+    switchScreen(statsScreen, deckScreen);
+  });
 }
 
 // Load exam settings if saved
@@ -331,16 +369,19 @@ function subscribeToDecks() {
 function showHome() {
   hideAllScreens();
   homeScreen.classList.remove('hidden');
+  pomodoroWidget.classList.add('hidden'); // Hide Pomo
 }
 
 function showAuth() {
   hideAllScreens();
   authScreen.classList.remove('hidden');
+  pomodoroWidget.classList.add('hidden'); // Hide Pomo
 }
 
 function showApp() {
   hideAllScreens();
   deckScreen.classList.remove('hidden');
+  pomodoroWidget.classList.remove('hidden'); // Show Pomo
   subscribeToDecks(); // Start syncing data
 }
 
@@ -1575,4 +1616,211 @@ function copyToCard(side) {
     textarea.scrollIntoView({ behavior: 'smooth' });
     textarea.focus();
   }
+}
+
+// ===== Pomodoro Functions =====
+
+function togglePomoWidget() {
+  pomodoroWidget.classList.toggle('collapsed');
+}
+
+function togglePomoTimer() {
+  if (pomoRunning) {
+    // Pause
+    clearInterval(pomoInterval);
+    pomoRunning = false;
+    pomoStartBtn.innerHTML = '<i class="fas fa-play"></i> Start';
+    pomoStartBtn.classList.remove('active');
+  } else {
+    // Start
+    pomoRunning = true;
+    pomoStartBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
+    pomoStartBtn.classList.add('active');
+
+    pomoInterval = setInterval(() => {
+      pomoTime--;
+      updatePomoDisplay();
+
+      if (pomoTime <= 0) {
+        clearInterval(pomoInterval);
+        pomoRunning = false;
+        pomoStartBtn.innerHTML = '<i class="fas fa-play"></i> Start';
+        pomoStartBtn.classList.remove('active');
+
+        // Notification
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification("Pomodoro Complete!", { body: "Time to take a break or get back to work!" });
+        } else if ("Notification" in window && Notification.permission !== "denied") {
+          Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+              new Notification("Pomodoro Complete!");
+            }
+          });
+        }
+        alert("Time is up!");
+
+        // Log Session if Work Mode
+        if (pomoMode === 'work') {
+          savePomoSession();
+        }
+      }
+    }, 1000);
+  }
+}
+
+function resetPomoTimer() {
+  clearInterval(pomoInterval);
+  pomoRunning = false;
+  pomoStartBtn.innerHTML = '<i class="fas fa-play"></i> Start';
+
+  if (pomoMode === 'work') pomoTime = 1500;
+  else if (pomoMode === 'short') pomoTime = 300;
+  else if (pomoMode === 'long') pomoTime = 900;
+
+  updatePomoDisplay();
+}
+
+function updatePomoDisplay() {
+  const minutes = Math.floor(pomoTime / 60);
+  const seconds = pomoTime % 60;
+  pomoTimeDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+  // Update document title?
+  // document.title = `(${minutes}:${seconds.toString().padStart(2, '0')}) InAFlash`;
+}
+
+function switchPomoMode(mode) {
+  pomoMode = mode;
+
+  // Update buttons
+  pomoModeBtns.forEach(btn => {
+    if (btn.dataset.mode === mode) btn.classList.add('active');
+    else btn.classList.remove('active');
+  });
+
+
+  resetPomoTimer();
+}
+
+// ===== Stats Logic =====
+
+async function savePomoSession() {
+  if (!user) return;
+
+  try {
+    await db.collection('users').doc(user.uid).collection('pomoSessions').add({
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      type: 'work',
+      duration: 1500 // assuming standard
+    });
+    console.log("Session saved!");
+  } catch (e) {
+    console.error("Error saving session:", e);
+  }
+}
+
+async function showStats() {
+  if (!user) return;
+  switchScreen(editorScreen, statsScreen); // Or from whatever screen
+  // Actually, handle back button depending on where we came from? 
+  // For now, assume coming from Decks/App view.
+
+  const sessionsRef = db.collection('users').doc(user.uid).collection('pomoSessions');
+
+  // Get last 7 days
+  const now = new Date();
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(now.getDate() - 7);
+
+  try {
+    const snapshot = await sessionsRef
+      .where('timestamp', '>', sevenDaysAgo)
+      .orderBy('timestamp', 'asc')
+      .get();
+
+    const sessions = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        ...data,
+        date: data.timestamp ? data.timestamp.toDate() : new Date()
+      };
+    });
+
+    processStats(sessions);
+
+  } catch (e) {
+    console.error("Error fetching stats:", e);
+    // Render empty chart if error or no data
+    processStats([]);
+  }
+}
+
+function processStats(sessions) {
+  // 1. Calculate Today's Count
+  const today = new Date().toDateString();
+  const todaysSessions = sessions.filter(s => s.date.toDateString() === today);
+  todaySessionCount.textContent = todaysSessions.length;
+
+  // 2. Prepare Weekly Data
+  const last7Days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    last7Days.push({
+      dateStr: d.toDateString(),
+      dayLabel: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      count: 0
+    });
+  }
+
+  // Fill counts
+  sessions.forEach(s => {
+    const sDate = s.date.toDateString();
+    const dayData = last7Days.find(d => d.dateStr === sDate);
+    if (dayData) {
+      dayData.count++;
+    }
+  });
+
+  renderWeeklyChart(last7Days);
+  updateMotivation(last7Days);
+}
+
+function renderWeeklyChart(data) {
+  weeklyChart.innerHTML = '';
+
+  const maxCount = Math.max(...data.map(d => d.count), 1); // Avoid div by 0
+
+  data.forEach(day => {
+    const heightPercent = (day.count / maxCount) * 100;
+
+    const group = document.createElement('div');
+    group.className = 'bar-group';
+
+    group.innerHTML = `
+      <div class="bar-value">${day.count > 0 ? day.count : ''}</div>
+      <div class="bar" style="height: ${heightPercent}%;"></div>
+      <div class="bar-label">${day.dayLabel}</div>
+    `;
+
+    weeklyChart.appendChild(group);
+  });
+}
+
+function updateMotivation(data) {
+  // Simple logic: Compare today vs yesterday
+  const todayCount = data[data.length - 1].count;
+  const yesterdayCount = data[data.length - 2].count;
+
+  let msg = "";
+  if (todayCount > yesterdayCount) {
+    msg = "You're doing better than yesterday! Keep it up!";
+  } else if (todayCount === yesterdayCount && todayCount > 0) {
+    msg = "Consistent effort! Great job.";
+  } else if (todayCount < yesterdayCount) {
+    msg = "Don't break the streak! Do one more session.";
+  } else {
+    msg = "Start small. Complete just one session today.";
+  }
+  motivationText.textContent = msg;
 }
