@@ -1,8 +1,8 @@
 Something I created for myself, but I think it'll be useful for students like me who rely on flashcards. :)
 
-Simple
-Reliable
-And keeps reminding you to study :P
+* Simple
+* Reliable
+* And keeps reminding you to study :P
 
 
 **What you can do:**
@@ -13,6 +13,7 @@ And keeps reminding you to study :P
 *   **Focus**: Use the built-in floating Pomodoro timer to manage your study sessions.
 *   **Track**: Monitor your daily progress with visually engaging study statistics.
 *   **Smart Create**: View PDFs side-by-side and extract text using OCR to create cards instantly.
+
 
 That's it! No complicated setup. Just login and start learning and scoring better.
 
