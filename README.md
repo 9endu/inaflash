@@ -19,7 +19,6 @@ Instead of scrolling on your phone(like I do)
 
 **Features to add**
 * Spaced Repition Scheduling
-* Pomodoro Timer
-* Automatic Flashcard Maker from PDF,PPT,Images,Text
+* Automatic Flashcard Maker from PPT,Images,Text
 
 
