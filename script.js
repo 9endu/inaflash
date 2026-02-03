@@ -7,6 +7,16 @@ let currentCardIndex = 0;
 let user = null; // Firebase User
 let unsubscribeDecks = null; // Firestore listener
 
+// ===== PDF/OCR State =====
+let pdfDoc = null;
+let pageNum = 1;
+let pageRendering = false;
+let pageNumPending = null;
+let scale = 1.0;
+let canvas = null;
+let ctx = null;
+let worker = null; // Tesseract worker
+
 // ... (retain existing quiz/exam state variables) ...
 
 // ... (retain existing quiz/exam state variables) ...
@@ -36,6 +46,13 @@ const editorScreen = document.getElementById('editorScreen');
 const studyScreen = document.getElementById('studyScreen');
 const quizScreen = document.getElementById('quizScreen');
 const examScreen = document.getElementById('examScreen');
+
+// PDF DOM
+const pdfPanel = document.getElementById('pdfPanel');
+const pdfCanvas = document.getElementById('pdfCanvas');
+const ocrText = document.getElementById('ocrText');
+const ocrOverlay = document.getElementById('ocrOverlay');
+const ocrResultContainer = document.getElementById('ocrResultContainer');
 
 // Auth DOM
 const getStartedBtn = document.getElementById('getStartedBtn');
@@ -247,6 +264,20 @@ function setupEventListeners() {
   document.getElementById('markWrongBtn').addEventListener('click', () => handleCramGrade(false));
   document.getElementById('markRightBtn').addEventListener('click', () => handleCramGrade(true));
   document.getElementById('exitCramBtn').addEventListener('click', exitCramMode);
+
+  // PDF & OCR Listeners
+  document.getElementById('togglePdfBtn').addEventListener('click', togglePdfPanel);
+  document.getElementById('pdfUpload').addEventListener('change', handlePdfUpload);
+  document.getElementById('prevPageBtn').addEventListener('click', onPrevPage);
+  document.getElementById('nextPageBtn').addEventListener('click', onNextPage);
+  document.getElementById('zoomInBtn').addEventListener('click', onZoomIn);
+  document.getElementById('zoomOutBtn').addEventListener('click', onZoomOut);
+  document.getElementById('ocrBtn').addEventListener('click', runOCR);
+  document.getElementById('copyToFrontBtn').addEventListener('click', () => copyToCard('front'));
+  document.getElementById('copyToBackBtn').addEventListener('click', () => copyToCard('back'));
+  document.getElementById('closeOcrBtn').addEventListener('click', () => {
+    ocrResultContainer.classList.add('hidden');
+  });
 }
 
 // Load exam settings if saved
@@ -1368,3 +1399,180 @@ function exitCramMode() {
   switchScreen(cramScreen, editorScreen);
 }
 
+
+// ===== PDF & OCR Functions =====
+
+function togglePdfPanel() {
+  pdfPanel.classList.toggle('hidden');
+  const btn = document.getElementById('togglePdfBtn');
+
+  if (pdfPanel.classList.contains('hidden')) {
+    btn.innerHTML = '<i class="fas fa-file-pdf"></i> Show PDF';
+  } else {
+    btn.innerHTML = '<i class="fas fa-times"></i> Hide PDF';
+    // If no PDF loaded, trigger upload click? No, let user choose.
+  }
+}
+
+function handlePdfUpload(e) {
+  const file = e.target.files[0];
+  if (file && file.type === 'application/pdf') {
+    const fileReader = new FileReader();
+    fileReader.onload = function () {
+      const typedarray = new Uint8Array(this.result);
+      loadPDF(typedarray);
+    };
+    fileReader.readAsArrayBuffer(file);
+  }
+}
+
+function loadPDF(data) {
+  // Using pdfjsLib from global scope (loaded via CDN)
+  pdfjsLib.getDocument(data).promise.then(function (pdf) {
+    pdfDoc = pdf;
+    pageNum = 1;
+    document.getElementById('pageCount').textContent = pdf.numPages;
+    document.getElementById('prevPageBtn').disabled = false;
+    document.getElementById('nextPageBtn').disabled = false;
+    document.getElementById('ocrBtn').disabled = false;
+
+    renderPage(pageNum);
+  }, function (reason) {
+    console.error("Error loading PDF: " + reason);
+    alert("Error loading PDF: " + reason);
+  });
+}
+
+function renderPage(num) {
+  pageRendering = true;
+  // Fetch page
+  pdfDoc.getPage(num).then(function (page) {
+    const viewport = page.getViewport({ scale: scale });
+    canvas = document.getElementById('pdfCanvas');
+    ctx = canvas.getContext('2d');
+
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+
+    // Render PDF page into canvas context
+    const renderContext = {
+      canvasContext: ctx,
+      viewport: viewport
+    };
+    const renderTask = page.render(renderContext);
+
+    // Wait for render to finish
+    renderTask.promise.then(function () {
+      pageRendering = false;
+      if (pageNumPending !== null) {
+        renderPage(pageNumPending);
+        pageNumPending = null;
+      }
+    });
+
+    document.getElementById('pageNum').textContent = num;
+  });
+
+  // Update page counters
+  document.getElementById('pageNum').textContent = num;
+}
+
+function queueRenderPage(num) {
+  if (pageRendering) {
+    pageNumPending = num;
+  } else {
+    renderPage(num);
+  }
+}
+
+function onPrevPage() {
+  if (pageNum <= 1) {
+    return;
+  }
+  pageNum--;
+  queueRenderPage(pageNum);
+}
+
+function onNextPage() {
+  if (pageNum >= pdfDoc.numPages) {
+    return;
+  }
+  pageNum++;
+  queueRenderPage(pageNum);
+}
+
+function onZoomIn() {
+  scale += 0.2;
+  renderPage(pageNum);
+}
+
+function onZoomOut() {
+  if (scale <= 0.4) return;
+  scale -= 0.2;
+  renderPage(pageNum);
+}
+
+// ===== OCR Logic =====
+async function runOCR() {
+  if (!canvas) return;
+
+  ocrOverlay.classList.remove('hidden');
+  ocrResultContainer.classList.add('hidden');
+  ocrText.value = "";
+
+  try {
+    // using Tesseract from global scope
+    const { data: { text } } = await Tesseract.recognize(
+      canvas,
+      'eng',
+      {
+        logger: m => console.log(m)
+      }
+    );
+
+    ocrText.value = text;
+    ocrResultContainer.classList.remove('hidden');
+  } catch (err) {
+    console.error(err);
+    alert("OCR Failed: " + err.message);
+  } finally {
+    ocrOverlay.classList.add('hidden');
+  }
+}
+
+function copyToCard(side) {
+  const text = ocrText.value;
+  if (!text) return;
+
+  // Assuming new card inputs (not yet created in UI, but existing cards rely on arrays)
+  // But wait, the user workflow is: View PDF -> Copy Text -> Paste into Card Inputs.
+
+  // Need to find the *currently focused* or last active card input?
+  // Or simpler: Just append to the *new card* inputs if we had a dedicated "Add Card" form.
+  // BUT: The current UI renders a list of cards with textareas.
+
+  // Strategy: Find the *last added* card's input fields (bottom of list) OR
+  // finding the currently empty one?
+  // Let's iterate cardsContainer and find the last card.
+
+  const cards = document.querySelectorAll('.card');
+  if (cards.length === 0) {
+    // If no cards, maybe add one?
+    addNewCard().then(() => {
+      // Retry copy after small delay? Or just alert.
+      setTimeout(() => copyToCard(side), 600);
+    });
+    return;
+  }
+
+  const lastCard = cards[cards.length - 1];
+  const textarea = lastCard.querySelector(`.${side}`);
+
+  if (textarea) {
+    textarea.value = (textarea.value ? textarea.value + "\n" : "") + text;
+    // Trigger change event to save to Firestore
+    textarea.dispatchEvent(new Event('change'));
+    textarea.scrollIntoView({ behavior: 'smooth' });
+    textarea.focus();
+  }
+}

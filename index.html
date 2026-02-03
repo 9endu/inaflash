@@ -73,6 +73,7 @@
       <div class="editor-header">
         <h2 id="currentDeckName">Deck Name</h2>
         <div class="editor-actions">
+          <button id="togglePdfBtn" class="secondary-btn"><i class="fas fa-file-pdf"></i> Show PDF</button>
           <button id="studyBtn" class="primary-btn"><i class="fas fa-book-open"></i> Study</button>
           <button id="quizBtn" class="primary-btn"><i class="fas fa-question-circle"></i> Quiz</button>
           <button id="examBtn" class="primary-btn"><i class="fas fa-graduation-cap"></i> Exam</button>
@@ -83,8 +84,57 @@
           <button id="backToDecksBtn"><i class="fas fa-arrow-left"></i> Decks</button>
         </div>
       </div>
-      <div class="cards" id="cardsContainer"></div>
-      <button id="addCardBtn" class="primary-btn"><i class="fas fa-plus"></i> Add Card</button>
+
+      <div class="editor-container">
+        <!-- PDF Viewer Panel -->
+        <div id="pdfPanel" class="pdf-panel hidden">
+          <div class="pdf-controls">
+            <input type="file" id="pdfUpload" accept=".pdf" class="hidden-input">
+            <button onclick="document.getElementById('pdfUpload').click()" class="icon-btn" title="Upload PDF">
+              <i class="fas fa-upload"></i>
+            </button>
+
+            <div class="page-nav">
+              <button id="prevPageBtn" class="icon-btn" disabled><i class="fas fa-chevron-left"></i></button>
+              <span id="pageInfo">Page <span id="pageNum">--</span> / <span id="pageCount">--</span></span>
+              <button id="nextPageBtn" class="icon-btn" disabled><i class="fas fa-chevron-right"></i></button>
+            </div>
+
+            <div class="zoom-nav">
+              <button id="zoomOutBtn" class="icon-btn"><i class="fas fa-minus"></i></button>
+              <button id="zoomInBtn" class="icon-btn"><i class="fas fa-plus"></i></button>
+            </div>
+
+            <button id="ocrBtn" class="primary-btn small-btn" disabled><i class="fas fa-magic"></i> Scan Page</button>
+          </div>
+
+          <div id="pdfContainer" class="pdf-container">
+            <canvas id="pdfCanvas"></canvas>
+            <div id="ocrOverlay" class="ocr-overlay hidden">
+              <div class="loader"></div>
+              <p>Scanning text...</p>
+            </div>
+          </div>
+
+          <div id="ocrResultContainer" class="ocr-result-container hidden">
+            <div class="ocr-actions">
+              <span>Extracted Text</span>
+              <div>
+                <button id="copyToFrontBtn" class="text-btn small">To Front</button>
+                <button id="copyToBackBtn" class="text-btn small">To Back</button>
+                <button id="closeOcrBtn" class="icon-btn"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+            <textarea id="ocrText" readonly></textarea>
+          </div>
+        </div>
+
+        <!-- Card Editor Panel -->
+        <div id="cardEditorPanel" class="card-editor-panel">
+          <div class="cards" id="cardsContainer"></div>
+          <button id="addCardBtn" class="primary-btn"><i class="fas fa-plus"></i> Add Card</button>
+        </div>
+      </div>
     </div>
 
     <!-- Study Screen -->
@@ -179,6 +229,13 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+  <!-- PDF.js and Tesseract.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
+  <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
 
   <script src="firebase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>

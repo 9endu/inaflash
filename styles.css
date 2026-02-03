@@ -1015,3 +1015,159 @@ button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
 }
+
+/* === Split Editor Layout === */
+.editor-container {
+  display: flex;
+  gap: var(--spacing-lg);
+  align-items: flex-start;
+  position: relative;
+}
+
+.pdf-panel {
+  flex: 1;
+  min-width: 0;
+  /* Prevent flex overflow */
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 200px);
+  /* Adjust based on header height */
+  position: sticky;
+  top: 20px;
+}
+
+.card-editor-panel {
+  flex: 1;
+  min-width: 0;
+  /* Prevent flex overflow */
+  width: 100%;
+}
+
+.pdf-panel.hidden {
+  display: none;
+}
+
+/* === PDF Viewer Controls === */
+.pdf-controls {
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  background: var(--bg-color);
+  border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+.page-nav,
+.zoom-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.pdf-container {
+  flex: 1;
+  overflow: auto;
+  background: #525659;
+  /* Standard PDF viewer bg color */
+  padding: var(--spacing-md);
+  display: flex;
+  justify-content: center;
+  position: relative;
+}
+
+#pdfCanvas {
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  max-width: 100%;
+}
+
+/* === OCR UI === */
+.ocr-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+}
+
+/* Duplicated loader animation removed (already exists in file) */
+
+.ocr-result-container {
+  height: 200px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  background: var(--card-bg);
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
+}
+
+.ocr-actions {
+  padding: var(--spacing-sm) var(--spacing-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-color);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+#ocrText {
+  flex: 1;
+  padding: var(--spacing-md);
+  border: none;
+  resize: none;
+  font-family: inherit;
+  font-size: 0.9rem;
+  width: 100%;
+}
+
+.small-btn {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
+
+.text-btn {
+  background: none;
+  border: none;
+  color: var(--primary-color);
+  cursor: pointer;
+  font-weight: 600;
+  padding: 4px 8px;
+}
+
+.text-btn:hover {
+  text-decoration: underline;
+  background: rgba(108, 92, 231, 0.1);
+  border-radius: 4px;
+}
+
+.hidden-input {
+  display: none;
+}
+
+/* Responsive Stacking */
+@media (max-width: 1024px) {
+  .editor-container {
+    flex-direction: column;
+  }
+
+  .pdf-panel {
+    width: 100%;
+    height: 500px;
+    position: static;
+  }
+}
