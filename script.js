@@ -1633,13 +1633,21 @@ function togglePomoTimer() {
     pomoStartBtn.classList.remove('active');
   } else {
     // Start
+    // Auto-reset if starting from 0 or negative
+    if (pomoTime <= 0) {
+      resetPomoTimer();
+    }
+
     pomoRunning = true;
     pomoStartBtn.innerHTML = '<i class="fas fa-pause"></i> Pause';
     pomoStartBtn.classList.add('active');
 
     pomoInterval = setInterval(() => {
-      pomoTime--;
-      updatePomoDisplay();
+      // Safety check to prevent negative time
+      if (pomoTime > 0) {
+        pomoTime--;
+        updatePomoDisplay();
+      }
 
       if (pomoTime <= 0) {
         clearInterval(pomoInterval);
