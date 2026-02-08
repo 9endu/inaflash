@@ -247,6 +247,7 @@ function setupEventListeners() {
 
   // App Listeners
   document.getElementById('newDeckBtn').addEventListener('click', createNewDeck);
+  document.getElementById('importDeckBtn').addEventListener('click', importDeck);
   document.getElementById('addCardBtn').addEventListener('click', addNewCard);
 
   // Navigation
@@ -427,8 +428,18 @@ function createDeckElement(deck) {
     deleteDeck(deck.id);
   });
 
+  const shareBtn = document.createElement('button');
+  shareBtn.className = 'icon-btn';
+  shareBtn.innerHTML = '<i class="fas fa-share-alt"></i>';
+  shareBtn.title = 'Share Deck';
+  shareBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    shareDeck(deck);
+  });
+
   deckActions.appendChild(editBtn);
   deckActions.appendChild(deleteBtn);
+  deckActions.appendChild(shareBtn);
 
   const cardCount = document.createElement('p');
   cardCount.textContent = `${deck.cards ? deck.cards.length : 0} cards`;
@@ -530,6 +541,74 @@ async function createNewDeck() {
     }
   } else {
     console.log("Cancelled or empty name");
+  }
+}
+
+async function shareDeck(deck) {
+  if (!user) {
+    alert("Please login to share decks.");
+    return;
+  }
+
+  const confirmShare = confirm(`Share "${deck.name}"? This will generate a unique ID for others to import this deck.`);
+  if (!confirmShare) return;
+
+  try {
+    // Check if already shared (optional optimization, but for now just create new share)
+    // Create a new document in 'shared_decks'
+    const shareRef = await db.collection('shared_decks').add({
+      originalAuthorId: user.uid,
+      originalAuthorName: user.email, // Or display name if available
+      name: deck.name,
+      cards: deck.cards || [],
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    const shareId = shareRef.id;
+    prompt("Deck Shared! Copy this ID and send it to your friends:", shareId);
+
+  } catch (error) {
+    console.error("Error sharing deck:", error);
+    alert(`Failed to share deck: ${error.message} (${error.code})`);
+  }
+}
+
+async function importDeck() {
+  if (!user) {
+    alert("Please login to import decks.");
+    return;
+  }
+
+  const shareId = prompt("Enter the Deck ID to import:");
+  if (!shareId) return;
+
+  try {
+    // 1. Fetch the shared deck
+    const shareDoc = await db.collection('shared_decks').doc(shareId).get();
+
+    if (!shareDoc.exists) {
+      alert("Invalid Deck ID. Deck not found.");
+      return;
+    }
+
+    const sharedData = shareDoc.data();
+    const newDeckName = prompt(`Importing "${sharedData.name}". Enter a name for your copy:`, sharedData.name);
+
+    if (!newDeckName) return; // User cancelled
+
+    // 2. Add to user's decks
+    await db.collection('users').doc(user.uid).collection('decks').add({
+      name: newDeckName,
+      cards: sharedData.cards || [],
+      importedFrom: shareId,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    alert("Deck imported successfully!");
+
+  } catch (error) {
+    console.error("Error importing deck:", error);
+    alert("Failed to import deck. Please check the ID and try again.");
   }
 }
 
@@ -637,8 +716,11 @@ function showCurrentCard() {
   const deck = decks.find(d => d.id === currentDeckId);
   if (!deck || !deck.cards[currentCardIndex]) return;
 
-  cardFront.innerHTML = deck.cards[currentCardIndex].front.replace(/\n/g, '<br>');
-  cardBack.innerHTML = deck.cards[currentCardIndex].back.replace(/\n/g, '<br>');
+  const frontContent = deck.cards[currentCardIndex].front.replace(/\n/g, '<br>');
+  const backContent = deck.cards[currentCardIndex].back.replace(/\n/g, '<br>');
+
+  cardFront.innerHTML = DOMPurify.sanitize(frontContent);
+  cardBack.innerHTML = DOMPurify.sanitize(backContent);
   flashcard.classList.remove('flipped');
   progress.textContent = `${currentCardIndex + 1}/${deck.cards.length}`;
 }
@@ -724,7 +806,8 @@ function nextQuizQuestion() {
   }
 
   const currentQuizCard = quizCards.pop();
-  quizQuestion.innerHTML = marked.parse(`**Question:** ${currentQuizCard.front}`);
+  const safeQuestion = DOMPurify.sanitize(marked.parse(`**Question:** ${currentQuizCard.front}`));
+  quizQuestion.innerHTML = safeQuestion;
 
   // Get 3 random wrong answers + correct answer
   const allCards = decks.find(d => d.id === currentDeckId).cards;
@@ -739,7 +822,7 @@ function nextQuizQuestion() {
   options.forEach(option => {
     const optionElement = document.createElement('div');
     optionElement.className = 'quiz-option';
-    optionElement.innerHTML = marked.parse(option);
+    optionElement.innerHTML = DOMPurify.sanitize(marked.parse(option));
     optionElement.addEventListener('click', () => {
       if (option === currentQuizCard.back) {
         quizScore++;

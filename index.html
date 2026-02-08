@@ -65,7 +65,10 @@
     <!-- Deck Selection Screen -->
     <div class="screen hidden" id="deckScreen">
       <div class="decks" id="decksContainer"></div>
-      <button id="newDeckBtn" class="primary-btn"><i class="fas fa-plus"></i> New Deck</button>
+      <div class="button-group">
+        <button id="newDeckBtn" class="primary-btn"><i class="fas fa-plus"></i> New Deck</button>
+        <button id="importDeckBtn" class="secondary-btn"><i class="fas fa-file-import"></i> Import Deck</button>
+      </div>
     </div>
 
     <!-- Editor Screen -->
@@ -300,6 +303,7 @@
 
   <script src="firebase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
   <script src="script.js"></script>
 </body>
 
