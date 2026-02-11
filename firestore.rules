@@ -5,6 +5,10 @@ service cloud.firestore {
     match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+
+    match /users/{userId}/folders/{folderId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
     
     // Shared decks - Accessible by any authenticated user
     match /shared_decks/{deckId} {
@@ -18,3 +22,4 @@ service cloud.firestore {
     }
   }
 }
+

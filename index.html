@@ -27,7 +27,7 @@
     <div class="screen" id="homeScreen">
       <div class="landing-content">
         <div class="landing-hero">
-          <h1>Master Your Studies with Ultimate Flashcards</h1>
+          <h1>Master Your Studies with InAFlash</h1>
           <p>Create, study, and ace your exams with our powerful spaced repetition system.</p>
           <div class="landing-actions">
             <button id="getStartedBtn" class="primary-btn landing-btn">Get Started</button>
@@ -64,10 +64,29 @@
 
     <!-- Deck Selection Screen -->
     <div class="screen hidden" id="deckScreen">
+      <div id="breadcrumbNav" class="breadcrumb-nav hidden">
+        <span id="breadcrumbRoot" class="breadcrumb-item">My Decks</span>
+        <!-- dynamic breadcrumbs appened here -->
+      </div>
       <div class="decks" id="decksContainer"></div>
       <div class="button-group">
         <button id="newDeckBtn" class="primary-btn"><i class="fas fa-plus"></i> New Deck</button>
+        <button id="newFolderBtn" class="secondary-btn"><i class="fas fa-folder-plus"></i> New Folder</button>
         <button id="importDeckBtn" class="secondary-btn"><i class="fas fa-file-import"></i> Import Deck</button>
+      </div>
+
+      <!-- Move Deck Modal -->
+      <div id="moveDeckModal" class="modal hidden">
+        <div class="modal-content">
+          <h3>Move Deck</h3>
+          <p>Select a folder to move this deck to:</p>
+          <div id="folderList" class="folder-list">
+            <!-- Folders injected here -->
+          </div>
+          <div class="modal-actions">
+            <button id="cancelMoveBtn" class="secondary-btn">Cancel</button>
+          </div>
+        </div>
       </div>
     </div>
 

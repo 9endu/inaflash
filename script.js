@@ -1,11 +1,15 @@
 const auth = window.auth;
 const db = window.db;
 // ===== App State =====
+// ===== App State =====
 let decks = [];
+let folders = []; // New folder state
 let currentDeckId = null;
+let currentFolderId = null; // Track current folder (null = root)
 let currentCardIndex = 0;
 let user = null; // Firebase User
 let unsubscribeDecks = null; // Firestore listener
+let unsubscribeFolders = null; // Folder listener
 
 // ===== PDF/OCR State =====
 let pdfDoc = null;
@@ -140,6 +144,10 @@ document.addEventListener('DOMContentLoaded', () => {
       userActions.classList.add('hidden');
     }
   });
+
+  // Clean up on unload/logout
+  if (unsubscribeFolders) unsubscribeFolders();
+
   document.getElementById('toggleThemeBtn').addEventListener('click', toggleTheme);
 
   // Call setupEventListeners after DOM is ready
@@ -160,7 +168,7 @@ function subscribeToDecks() {
       id: doc.id,
       ...doc.data()
     }));
-    renderDecks();
+    renderBrowser(); // Changed from renderDecks to renderBrowser
 
     // If currently viewing a deck, update it
     if (currentDeckId) {
@@ -171,6 +179,18 @@ function subscribeToDecks() {
     }
   }, error => {
     console.error("Error fetching decks: ", error);
+  });
+
+  // Subscribe to Folders
+  const userFoldersRef = db.collection('users').doc(user.uid).collection('folders');
+  unsubscribeFolders = userFoldersRef.onSnapshot(snapshot => {
+    folders = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    renderBrowser();
+  }, error => {
+    console.error("Error fetching folders: ", error);
   });
 }
 
@@ -247,8 +267,12 @@ function setupEventListeners() {
 
   // App Listeners
   document.getElementById('newDeckBtn').addEventListener('click', createNewDeck);
+  document.getElementById('newFolderBtn').addEventListener('click', createNewFolder);
   document.getElementById('importDeckBtn').addEventListener('click', importDeck);
   document.getElementById('addCardBtn').addEventListener('click', addNewCard);
+
+  // Move Modal Listeners
+  document.getElementById('cancelMoveBtn').addEventListener('click', closeMoveModal);
 
   // Navigation
   document.getElementById('backToDecksBtn').addEventListener('click', () => {
@@ -330,42 +354,7 @@ if (savedExamSettings) {
 // ===== Core Functions =====
 
 // Fetch Decks from Firestore
-function subscribeToDecks() {
-  if (!user) return;
-
-  if (unsubscribeDecks) unsubscribeDecks();
-
-  const userDecksRef = db.collection('users').doc(user.uid).collection('decks');
-  console.log("Subscribing to:", user.uid); // Debug log
-
-  unsubscribeDecks = userDecksRef.onSnapshot(snapshot => {
-    console.log("Snapshot received!", snapshot.size, "docs"); // Debug log
-
-    if (snapshot.empty) {
-      // Optional: Inform user if no decks exist yet
-      // console.log("No decks found.");
-    }
-
-    decks = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    renderDecks();
-
-    // If currently viewing a deck, update it
-    if (currentDeckId) {
-      const currentDeck = decks.find(d => d.id === currentDeckId);
-      if (currentDeck) {
-        renderCards(currentDeck.cards || []);
-      }
-    }
-  }, error => {
-    // Silent error on permission denied (usually logout race condition)
-    if (error.code !== 'permission-denied') {
-      console.error("Error fetching decks: ", error);
-    }
-  });
-}
+// function subscribeToDecks() { ... } // Removed redundant definition
 
 function showHome() {
   hideAllScreens();
@@ -391,13 +380,265 @@ function hideAllScreens() {
   screens.forEach(s => s.classList.add('hidden'));
 }
 
-function renderDecks() {
+function renderBrowser() {
+  console.log("Rendering Browser. Current Folder:", currentFolderId);
+  console.log("Total Decks:", decks.length);
+  console.log("Total Folders:", folders.length);
+
   decksContainer.innerHTML = '';
-  decks.forEach(deck => {
+  updateBreadcrumbs();
+
+  // 1. Render Folders (only those in currentFolderId)
+  const currentFolders = folders.filter(f => {
+    // Treat undefined parentId as null (root)
+    const pid = f.parentId || null;
+    return pid === currentFolderId;
+  });
+
+  currentFolders.forEach(folder => {
+    decksContainer.appendChild(createFolderElement(folder));
+  });
+
+  // 2. Render Decks (only those in currentFolderId)
+  const currentDecks = decks.filter(d => {
+    // Treat undefined folderId as null (root)
+    const fid = d.folderId || null;
+    return fid === currentFolderId;
+  });
+
+  console.log("Decks to render:", currentDecks.length);
+
+  currentDecks.forEach(deck => {
     decksContainer.appendChild(createDeckElement(deck));
   });
+
+  if (currentFolders.length === 0 && currentDecks.length === 0) {
+    decksContainer.innerHTML = '<p class="empty-state">This folder is empty. Create a deck or folder to get started!</p>';
+  }
 }
 
+function updateBreadcrumbs() {
+  const nav = document.getElementById('breadcrumbNav');
+  nav.classList.remove('hidden');
+  nav.innerHTML = '';
+
+  // Always start with Root
+  const root = document.createElement('span');
+  root.textContent = 'My Decks';
+  root.className = 'breadcrumb-item';
+  root.onclick = () => navigateToFolder(null);
+  nav.appendChild(root);
+
+  if (currentFolderId) {
+    // Find path to root
+    const path = [];
+    let current = folders.find(f => f.id === currentFolderId);
+    while (current) {
+      path.unshift(current);
+      current = folders.find(f => f.id === current.parentId);
+    }
+
+    path.forEach(folder => {
+      const sep = document.createElement('span');
+      sep.innerHTML = '<i class="fas fa-chevron-right"></i>';
+      sep.className = 'breadcrumb-separator';
+      nav.appendChild(sep);
+
+      const item = document.createElement('span');
+      item.textContent = folder.name;
+      item.className = 'breadcrumb-item';
+      // Clicking a breadcrumb navigates to that folder
+      item.onclick = () => navigateToFolder(folder.id);
+      nav.appendChild(item);
+    });
+  }
+}
+
+function navigateToFolder(folderId) {
+  currentFolderId = folderId;
+  renderBrowser();
+}
+
+function createFolderElement(folder) {
+  const el = document.createElement('div');
+  el.className = 'deck folder'; // reuse deck styles + folder specifics
+  el.dataset.id = folder.id;
+
+  const title = document.createElement('h3');
+  title.innerHTML = '<i class="fas fa-folder"></i> ' + folder.name;
+
+  const actions = document.createElement('div');
+  actions.className = 'deck-actions';
+
+  // Delete Folder button (only if empty?)
+  const delBtn = document.createElement('button');
+  delBtn.className = 'icon-btn';
+  delBtn.innerHTML = '<i class="fas fa-trash"></i>';
+  delBtn.title = 'Delete Folder';
+  delBtn.onclick = (e) => {
+    e.stopPropagation();
+    deleteFolder(folder.id);
+  };
+  actions.appendChild(delBtn);
+
+  el.appendChild(title);
+  el.appendChild(actions);
+
+  el.onclick = () => navigateToFolder(folder.id);
+
+  return el;
+}
+
+async function createNewFolder() {
+  const name = prompt("Enter folder name:");
+  if (!name) return;
+
+  try {
+    await db.collection('users').doc(user.uid).collection('folders').add({
+      name: name,
+      parentId: currentFolderId,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (e) {
+    console.error("Error creating folder:", e);
+    alert("Failed to create folder");
+  }
+}
+
+async function deleteFolder(folderId) {
+  // Check if empty
+  const childFolders = folders.filter(f => f.parentId === folderId);
+  const childDecks = decks.filter(d => d.folderId === folderId);
+
+  if (childFolders.length > 0 || childDecks.length > 0) {
+    alert("Folder is not empty! Please move or delete contents first.");
+    return;
+  }
+
+  if (confirm("Delete this folder?")) {
+    try {
+      await db.collection('users').doc(user.uid).collection('folders').doc(folderId).delete();
+    } catch (e) {
+      console.error("Error deleting folder:", e);
+      alert("Failed to delete folder");
+    }
+  }
+}
+
+// Move Deck Functionality
+let deckToMoveId = null;
+
+function openMoveModal(deckId) {
+  deckToMoveId = deckId;
+  const modal = document.getElementById('moveDeckModal');
+  const list = document.getElementById('folderList');
+  list.innerHTML = '';
+
+  // Option: Root
+  const rootOption = document.createElement('div');
+  rootOption.className = 'folder-select-item';
+  rootOption.innerHTML = '<i class="fas fa-home"></i> My Decks (Root)';
+  rootOption.onclick = () => moveDeckTo(null);
+  list.appendChild(rootOption);
+
+  // Flatten folders or show hierarchy? Flat list with names for now is easiest MVP
+  // Ideally exclude current folder safely
+  folders.forEach(f => {
+    const item = document.createElement('div');
+    item.className = 'folder-select-item';
+    item.innerHTML = '<i class="fas fa-folder"></i> ' + f.name;
+    item.onclick = () => moveDeckTo(f.id);
+    list.appendChild(item);
+  });
+
+  modal.classList.remove('hidden');
+}
+
+function closeMoveModal() {
+  document.getElementById('moveDeckModal').classList.add('hidden');
+  deckToMoveId = null;
+}
+
+async function moveDeckTo(targetFolderId) {
+  if (!deckToMoveId) return;
+
+  try {
+    await db.collection('users').doc(user.uid).collection('decks').doc(deckToMoveId).update({
+      folderId: targetFolderId
+    });
+    closeMoveModal();
+  } catch (e) {
+    console.error("Error moving deck:", e);
+    alert("Failed to move deck");
+  }
+}
+
+// Update createDeckElement to include Move button
+function createDeckElement(deck) {
+  const deckElement = document.createElement('div');
+  deckElement.className = 'deck';
+  deckElement.dataset.id = deck.id;
+
+  const deckTitle = document.createElement('h3');
+  deckTitle.textContent = deck.name;
+  deckTitle.className = 'deck-title';
+
+  const deckActions = document.createElement('div');
+  deckActions.className = 'deck-actions';
+
+  const editBtn = document.createElement('button');
+  editBtn.className = 'icon-btn';
+  editBtn.innerHTML = '<i class="fas fa-edit"></i>';
+  editBtn.title = 'Edit Deck Name';
+  editBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    editDeckName(deck.id, deckTitle);
+  });
+
+  const moveBtn = document.createElement('button');
+  moveBtn.className = 'icon-btn';
+  moveBtn.innerHTML = '<i class="fas fa-arrows-alt"></i>'; // Move icon
+  moveBtn.title = 'Move Deck';
+  moveBtn.onclick = (e) => {
+    e.stopPropagation();
+    openMoveModal(deck.id);
+  }
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'icon-btn';
+  deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+  deleteBtn.title = 'Delete Deck';
+  deleteBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    deleteDeck(deck.id);
+  });
+
+  const shareBtn = document.createElement('button');
+  shareBtn.className = 'icon-btn';
+  shareBtn.innerHTML = '<i class="fas fa-share-alt"></i>';
+  shareBtn.title = 'Share Deck';
+  shareBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    shareDeck(deck);
+  });
+
+  deckActions.appendChild(editBtn);
+  deckActions.appendChild(moveBtn); // Add Move button
+  deckActions.appendChild(deleteBtn);
+  deckActions.appendChild(shareBtn);
+
+  const cardCount = document.createElement('p');
+  cardCount.textContent = `${deck.cards ? deck.cards.length : 0} cards`;
+
+  deckElement.appendChild(deckTitle);
+  deckElement.appendChild(cardCount);
+  deckElement.appendChild(deckActions);
+
+  deckElement.addEventListener('click', () => openDeck(deck.id));
+
+  return deckElement;
+}
+/*
 function createDeckElement(deck) {
   const deckElement = document.createElement('div');
   deckElement.className = 'deck';
@@ -452,95 +693,30 @@ function createDeckElement(deck) {
 
   return deckElement;
 }
-
-function editDeckName(deckId, titleElement) {
-  const deck = decks.find(d => d.id === deckId);
-  if (!deck) return;
-
-  const currentName = deck.name;
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.value = currentName;
-  input.className = 'deck-name-input';
-
-  // Replace the title with input
-  titleElement.replaceWith(input);
-  input.focus();
-
-  async function saveName() {
-    const newName = input.value.trim();
-    if (newName && newName !== currentName) {
-      try {
-        await db.collection('users').doc(user.uid).collection('decks').doc(deckId).update({
-          name: newName
-        });
-      } catch (e) {
-        console.error("Error updating deck name:", e);
-        alert("Failed to update name");
-      }
-    }
-    // No need to manually update UI, listener will handle it
-    input.replaceWith(titleElement); // Temporary revert until listener fires
-  }
-
-  input.addEventListener('blur', saveName);
-  input.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      saveName();
-    }
-  });
-}
-
-async function deleteDeck(deckId) {
-  if (confirm('Delete this deck and all its cards?')) {
-    try {
-      await db.collection('users').doc(user.uid).collection('decks').doc(deckId).delete();
-      // Listener updates UI
-      if (currentDeckId === deckId) {
-        switchScreen(editorScreen, deckScreen);
-        currentDeckId = null;
-      }
-    } catch (e) {
-      console.error("Error deleting deck:", e);
-      alert("Failed to delete deck");
-    }
-  }
-}
+*/
 
 async function createNewDeck() {
   console.log("Step 1: Button Clicked");
   const deckName = prompt('Enter deck name:');
 
   if (deckName) {
-    console.log("Step 2: Name entered: " + deckName);
-
     if (!user) {
-      console.log("Error: No user logged in!");
       alert("Error: No user logged in!");
       return;
     }
-    console.log("Step 3: User ID is " + user.uid);
 
     try {
-      console.log("Step 4: Attempting to write to Firestore...");
-
-      // Simple add call without aggressive timeout race for now, 
-      // as standard Firestore calls handle offline/latency better natively.
       await db.collection('users').doc(user.uid).collection('decks').add({
         name: deckName,
         cards: [],
+        folderId: currentFolderId, // Add to current folder
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-
-      console.log("Step 5: Success! Deck saved.");
       // Listener updates UI
     } catch (e) {
       console.error("Error creating deck:", e);
-      console.log("Step 5 Failed: " + e.message);
       alert("Failed to create deck: " + e.message);
     }
-  } else {
-    console.log("Cancelled or empty name");
   }
 }
 

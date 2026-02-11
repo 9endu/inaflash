@@ -13,6 +13,7 @@ Something I created for myself, but I think it'll be useful for students like me
 *   **Focus**: Use the built-in floating Pomodoro timer to manage your study sessions.
 *   **Track**: Monitor your daily progress with visually engaging study statistics.
 *   **Smart Create**: View PDFs side-by-side and extract text using OCR to create cards instantly.
+*   **Share**: Share your decks with others.
 
 
 That's it! No complicated setup. Just login and start learning and scoring better.
