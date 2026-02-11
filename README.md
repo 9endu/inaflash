@@ -16,7 +16,7 @@ Something I created for myself, but I think it'll be useful for students like me
 *   **Share**: Share your decks with others.
 
 
-That's it! No complicated setup. Just login and start learning and scoring better.
+That's it! Just login and start learning and scoring better.
 
 
 Instead of scrolling on your phone(like I do)
