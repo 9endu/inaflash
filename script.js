@@ -372,6 +372,16 @@ function showApp() {
   hideAllScreens();
   deckScreen.classList.remove('hidden');
   pomodoroWidget.classList.remove('hidden'); // Show Pomo
+
+  // Show Loading Alert
+  decksContainer.innerHTML = `
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center;">
+      <div class="loader" style="border-color: rgba(108, 92, 231, 0.3); border-top-color: var(--primary-color); width: 40px; height: 40px;"></div>
+      <h3 style="margin-top: 20px; color: var(--text-color);">Loading your Library...</h3>
+      <p style="color: var(--text-light); margin-top: 10px;">Don't panic! Your folders and decks are on their way.</p>
+    </div>
+  `;
+
   subscribeToDecks(); // Start syncing data
 }
 
