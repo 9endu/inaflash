@@ -730,6 +730,36 @@ async function createNewDeck() {
   }
 }
 
+async function editDeckName(deckId, titleElement) {
+  const newName = prompt("Enter new deck name:", titleElement.textContent);
+  if (newName && newName !== titleElement.textContent) {
+    try {
+      await db.collection('users').doc(user.uid).collection('decks').doc(deckId).update({
+        name: newName
+      });
+    } catch (e) {
+      console.error("Error updating deck name:", e);
+      alert("Failed to update deck name");
+    }
+  }
+}
+
+async function deleteDeck(deckId) {
+  if (confirm("Are you sure you want to delete this deck? This cannot be undone.")) {
+    try {
+      await db.collection('users').doc(user.uid).collection('decks').doc(deckId).delete();
+      // If currently viewing this deck, go back to decks list
+      if (currentDeckId === deckId) {
+        currentDeckId = null;
+        switchScreen(editorScreen, deckScreen);
+      }
+    } catch (e) {
+      console.error("Error deleting deck:", e);
+      alert("Failed to delete deck");
+    }
+  }
+}
+
 async function shareDeck(deck) {
   if (!user) {
     alert("Please login to share decks.");
